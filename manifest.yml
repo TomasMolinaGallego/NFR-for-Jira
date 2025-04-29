@@ -1,0 +1,49 @@
+modules:
+  jira:globalPage:
+    - key: NFR-for-jira
+      resource: main
+      resolver:
+        function: resolver
+      render: native
+      title: NFR for Jira
+      pages:
+      - title: View catalogues
+        route: catalogues
+        icon: https://www.pngall.com/wp-content/uploads/4/World-Wide-Web-PNG-Image-File.png
+      - title: View requirements 
+        route: requirements
+        icon: https://www.pngall.com/wp-content/uploads/4/World-Wide-Web-PNG-Image-File.png
+      - title: Create catalogues
+        route: create-catalogues
+        icon: https://www.pngall.com/wp-content/uploads/4/World-Wide-Web-PNG-Image-File.png
+  jira:issuePanel:
+    - key: requirement-panel
+      resource: panel
+      resolver:
+        function: resolver
+      render: native
+      title: NFR Requirements
+      handler: index.panel
+      icon: https://www.pngall.com/wp-content/uploads/4/World-Wide-Web-PNG-Image-File.png
+
+  function:
+    - key: resolver
+      handler: index.handler
+    - key: panel
+      handler: index.panel
+resources:
+  - key: main
+    path: src/frontend/index.jsx
+  - key: panel
+    path: src/frontend/issue-panel/index.jsx
+app:
+  runtime:
+    name: nodejs22.x
+  id: ari:cloud:ecosystem::app/938822de-65fd-4ed2-815f-c2c88015fa7b
+permissions:
+  scopes:
+    - storage:app
+    - read:jira-work
+    - write:jira-work
+    - read:jira-user
+    - read:me
