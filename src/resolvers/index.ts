@@ -37,10 +37,11 @@ const getCatalog = async (catalogId: string) => {
 const updateCatalogRequirements = async (catalogId: string, updateFn: (requirements: any[]) => any[]) => {
   const catalog = await getCatalog(catalogId);
   catalog.requirements = updateFn(catalog.requirements);
+
   return saveCatalog(catalog);
 };
 
-const updateRequirementIssuesLinked = async (catalogId: string, reqId: string, updateFn: (issues: any[]) => any[]) => {
+const updateRequirementIssuesLinked = async (catalogId: string, reqId: string, updateFn: (issues: any[]) => any[], explanation?: string) => {
   return updateCatalogRequirements(catalogId, requirements =>
     requirements.map(req =>
       req.id === reqId ? { ...req, issuesLinked: updateFn(req.issuesLinked || []) } : req
@@ -175,12 +176,11 @@ resolver.define('unlinkRequirement', async ({ payload }) => {
   const issueStorageKey = `issue-${payload.issueKey}`;
   const issueData = (await storage.get(issueStorageKey) || [])
     .filter(item => !(item.reqId === payload.reqId && item.catalogId === payload.catalogId));
-
   await storage.set(issueStorageKey, issueData);
 
   await updateRequirementIssuesLinked(
     payload.catalogId,
-    payload.requirementId,
+    payload.reqId,
     issues => issues.filter(issue => issue.issueKey !== payload.issueKey)
   );
   const issue = await storage.get(`issue-${payload.issueKey}`) || [];
@@ -197,14 +197,15 @@ resolver.define('setStatusRequirement', async ({ payload }) => {
     payload.catalogId,
     payload.reqId,
     issues => issues.map(issue =>
-      issue.issueKey === payload.issueKey ? { ...issue, status: payload.status } : issue
+      issue.issueKey === payload.issueKey ? { ...issue, status: payload.status, explanation: payload.explanation } : issue
     )
+    
   );
   const issueStorageKey = `issue-${payload.issueKey}`;
   const issueData = await storage.get(issueStorageKey) || [];
   const updatedIssue = issueData.map(item => {
     if (item.reqId === payload.reqId && item.catalogId === payload.catalogId) {
-      return { ...item, status: payload.status };
+      return { ...item, status: payload.status, explanation: payload.explanation };
     }
     return item;
   }

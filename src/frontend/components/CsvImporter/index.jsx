@@ -5,16 +5,24 @@ import {
     Text,
     Button,
     TextArea,
-    DynamicTable,
     Form
 } from '@forge/react';
 import { invoke, view } from "@forge/bridge";
 
-const CSVImporter = (catalog, onUpdate) => {
+/**
+ * Component to import requirements from a CSV file.
+ * It allows the user to paste CSV data into a text area and submit it for processing.
+ * @returns 
+ */
+const CSVImporter = (catalog) => {
     const [csvData, setCsvData] = useState('');
     const [results, setResults] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
 
+    /**
+     * * Handler to process the CSV data when the form is submitted.
+     * It calls the backend function to import the requirements and reload the state with the results.
+     */
     const handleImport = async () => {
         setIsLoading(true);
         const importResults = await invoke('importRequirementsFromCSV', {
@@ -30,17 +38,17 @@ const CSVImporter = (catalog, onUpdate) => {
 
     return (
         <Box padding="medium">
-            <Text size="xlarge" weight="bold">Importador CSV de Requisitos</Text>
-            <Text>Introduce los requisitos en formato CSV. Asegúrate de que el formato sea correcto.</Text>
-            <Text>Ejemplo de formato CSV:</Text>
-            <Text>Title,Description,Type,Category,Important,Validation,CorrelationRules,Dependencies</Text>
-            <Text>User Data Encryption,Ensure that user data is encrypted in transit and at rest,Privacy,Security,90,Encryption protocols in place,REQ-1;REQ-2,REQ-1;REQ-2</Text>
+            <Text size="xlarge" weight="bold">Requirements CSV Importer</Text>
+            <Text>Enter the requirements in CSV format. Make sure the format is correct.</Text>
+            <Text>Example of CSV format:</Text>
+            <Text>ID,Title,Description,Type,Category,Important,Validation,CorrelationRules,Dependencies</Text>
+            <Text>1,Fast Page Load,Ensure that webpages load within 2 seconds under normal load,Non-Functional,Performance,90,Load tests measuring page response times,2;3,4;5</Text>
 
             <Form onSubmit={handleImport}>
                 <Box marginTop="medium">
                     <TextArea
-                        label="Datos CSV"
-                        placeholder="Pega aquí el contenido del CSV..."
+                        label="CSV data"
+                        placeholder="Paste here the content of the CSV..."
                         value={csvData}
                         onChange={e => setCsvData(e.target.value)}
                         rows={10}
@@ -54,15 +62,15 @@ const CSVImporter = (catalog, onUpdate) => {
                         type="submit"
                         isDisabled={isLoading}
                     >
-                        {isLoading ? 'Importando...' : 'Iniciar Importe'}
+                        {isLoading ? 'Importing...' : 'Start import'}
                     </Button>
                 </Box>
             </Form>
 
             {results && (
                 <Box marginTop="xlarge">
-                    <Text weight="bold">Resultados:</Text>
-                    <Text>Total requisitos añadidos: {results.total}</Text>
+                    <Text weight="bold">Results:</Text>
+                    <Text>Total requirements added: {results.total}</Text>
                 </Box>
             )}
         </Box>

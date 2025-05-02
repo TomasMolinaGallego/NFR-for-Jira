@@ -8,19 +8,29 @@ const getBadgeAppearance = (value) => {
     if (num < 66) return 'primary';
     return 'important';
 };
-
+/**
+ * Component to display a requirement card.
+ * It shows the requirement title, description, and other details.
+ * It also allows editing and deleting the requirement.
+ * {@param {Object} req - The requirement object to display.
+ * @param {Function} onUpdateRequirement - Function to call when updating the requirement.
+ * @param {Function} onDeleteRequirement - Function to call when deleting the requirement.
+ */
 const Card = memo(({ req, onUpdateRequirement, onDeleteRequirement }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [editingRequirement, setEditingRequirement] = useState(null);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
+    // Switches the expanded state of the card.
     const toggleExpanded = useCallback(() => setIsExpanded(prev => !prev), []);
 
+    // Opens the edit modal with the current requirement data.
     const handleEditRequirement = useCallback(() => {
         setEditingRequirement(req);
         setIsEditModalOpen(true);
     }, [req]);
 
+    // Handles the save action in the edit modal, updates the requirement, and closes the modal.
     const handleSaveChanges = useCallback(async (updatedData) => {
         try {
             await onUpdateRequirement(req.catalogId, req.id, updatedData);
@@ -30,6 +40,7 @@ const Card = memo(({ req, onUpdateRequirement, onDeleteRequirement }) => {
         }
     }, [onUpdateRequirement, req.catalogId, req.id]);
 
+    // Handles the delete action, confirms with the user, and calls the delete function.
     const handleDeleteConfirmation = useCallback(() => {
         onDeleteRequirement(req.catalogId, req.id);
     }, [onDeleteRequirement, req.catalogId, req.id]);
@@ -78,9 +89,10 @@ const Card = memo(({ req, onUpdateRequirement, onDeleteRequirement }) => {
                                     <Box>
                                         <Text>{req.description}</Text>
                                         {renderBadges()}
-                                        {req.validation && <Text>Validación: {req.validation}</Text>}
-                                        {req.correlation && <Text>Correlación: {req.correlation}</Text>}
-                                        {req.dependencies && <Text>Dependencias: {req.dependencies}</Text>}
+                                        {req.validation && <Text>Validation: {req.validation}</Text>}
+                                        {req.correlation && <Text>Correlation: {req.dependencies.join(', ')}</Text>}
+                                        {req.dependencies && <Text>Dependencies: {req.dependencies.join(', ')}</Text>}
+                                        {req.issuesLinked && <Text>Issues linked: {req.issuesLinked?.map(issue => issue.issueKey).join(', ')}</Text>}
                                     </Box>
                                     <Inline>
                                         <Button

@@ -1,15 +1,19 @@
-import React, { useEffect, useState } from 'react';
-import { List, ListItem, Text, Box, Inline, Textfield, Tag, Button } from '@forge/react';
+import React, { useState } from 'react';
+import { List, Text, Box, Inline, Textfield, Tag, Button } from '@forge/react';
 
+/**
+ * Component to display a searchable dropdown list of requirements
+ * It allows searching for options by title and selecting them.
+ */
 const SearchableDropdown = ({ options = [], selected = [], onSelect, label }) => {
-  // Garantizamos que options y selected sean arrays
   const optionsArray = Array.isArray(options) ? options : [];
   const selectedArray = Array.isArray(selected) ? selected : [];
 
   const [searchTerm, setSearchTerm] = useState('');
   const [isOpen, setIsOpen] = useState(false);
 
-  // Se filtran las opciones en función del searchTerm y de las opciones ya seleccionadas
+  // Filter options based on the search term and selected items
+  // It checks if the title of the option includes the search term and if the option is not already selected
   const filteredOptions = optionsArray.filter(opt => {
     if (!opt.title) return false;
     return (

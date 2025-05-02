@@ -12,14 +12,16 @@ import {
 import EditRequirementModal from '../EditRequirementModal';
 import CSVImporter from '../CsvImporter';
 
-// Función para determinar la apariencia del badge de importancia
 const getImportanceAppearance = (value) => {
   const num = parseInt(value) || 0;
   if (num < 33) return 'added';
   if (num < 66) return 'primary';
   return 'important';
 };
-
+/**
+ * Component to display a requirement of a catalog, it can be expanded to show more details.
+ * It allows editing and deleting the requirement.
+ */
 const CatalogListItem = memo(({
   catalog,
   onSelect,
@@ -32,36 +34,46 @@ const CatalogListItem = memo(({
   const [editingRequirement, setEditingRequirement] = useState(null);
   const [isCsvImporterOpen, setIsCsvImporterOpen] = useState(false);
 
-  // Handlers memoizados
   const toggleExpanded = useCallback(() => {
     setIsExpanded(prev => !prev);
   }, []);
 
+  /**
+   * * Handler to edit a requirement. It assigns the selected requirement to the editingRequirement state.
+   */
   const handleEditRequirement = useCallback((requirement) => {
     setEditingRequirement(requirement);
   }, []);
 
+  /**
+   * Handler to save changes made to a requirement. It calls the onUpdateRequirement function passed as a prop.
+   */
   const handleSaveChanges = useCallback(async (updatedData) => {
     await onUpdateRequirement(catalog.id, editingRequirement.id, updatedData);
     setEditingRequirement(null);
   }, [catalog.id, editingRequirement, onUpdateRequirement]);
 
+  /**
+   * * Handler to import a CSV file. It calls the onUpdateCsv function passed as a prop.
+   */
   const handleCsvImportComplete = useCallback(async () => {
     await onUpdateCsv?.();
     setIsCsvImporterOpen(false);
   }, [onUpdateCsv]);
 
+  /**
+   * Handler to change the location of the catalog only used to consult the details of a catalog.
+   */
   const changeLocation = useCallback(() => {
     history.push(`/catalogues/${catalog.id}`);
   }, [catalog.id, history]);
 
-  // Renderizado optimizado de requisitos
   const renderRequirementBadges = useCallback((req) => (
     <Inline space="small" marginTop="small">
       {req.type && <Badge appearance="primary">{req.type}</Badge>}
       {req.category && <Badge appearance="added">{req.category}</Badge>}
       {req.important && (
-        <Badge 
+        <Badge
           appearance={getImportanceAppearance(req.important)}
           max={100}
         >
@@ -76,15 +88,15 @@ const CatalogListItem = memo(({
       <Text weight="medium">{req.id}</Text>
       <Text color="subtlest">{req.description}</Text>
       {renderRequirementBadges(req)}
-      {req.validation && <Text size="small">Validación: {req.validation}</Text>}
-      {req.correlation && <Text size="small">Correlación: {req.correlation.join(', ')}</Text>}
-      {req.dependencies && <Text size="small">Dependencias: {req.dependencies.join(', ')}</Text>}
+      {req.validation && <Text size="small">Validation: {req.validation}</Text>}
+      {req.correlation && <Text size="small">Correlation: {req.correlation.join(', ')}</Text>}
+      {req.dependencies && <Text size="small">Dependencies: {req.dependencies.join(', ')}</Text>}
     </Stack>
   ), [renderRequirementBadges]);
 
   const renderRequirements = useCallback(() => {
     if (!catalog.requirements?.length) {
-      return <Text color="disabled">No hay requisitos en este catálogo</Text>;
+      return <Text color="disabled">There are no requirements in this catalogue</Text>;
     }
 
     return (
@@ -113,7 +125,6 @@ const CatalogListItem = memo(({
   return (
     <ListItem padding="medium" background="neutralSubtle" borderRadius="normal">
       <Stack space="medium">
-        {/* Cabecera del catálogo */}
         <Inline spread="space-between" alignBlock="center">
           <Inline space="medium" alignBlock="center">
             <Button
@@ -126,32 +137,32 @@ const CatalogListItem = memo(({
               <Text weight="bold">{catalog.title}</Text>
               <Text color="subtlest" size="small">{catalog.description}</Text>
               <Text size="small" color="disabled">
-                {catalog.requirements?.length || 0} requisitos
+                {catalog.requirements?.length || 0} requirements
               </Text>
             </Stack>
           </Inline>
 
           <Inline space="medium">
-            <Button 
+            <Button
               onClick={changeLocation}
               iconBefore="eye-open"
               appearance="primary"
             >
-              Detalles
+              Details
             </Button>
-            <Button 
+            <Button
               onClick={handleOpenModal}
               iconBefore="add"
               appearance="default"
             >
-              Nuevo Requisito
+              New Requirement
             </Button>
             <Button
               onClick={() => setIsCsvImporterOpen(isCsvImporterOpen => !isCsvImporterOpen)}
               iconBefore="upload"
               appearance="default"
             >
-              Importar CSV
+              Import CSV
             </Button>
             <Button
               onClick={() => onDelete(catalog.id)}
@@ -162,14 +173,12 @@ const CatalogListItem = memo(({
           </Inline>
         </Inline>
 
-        {/* Contenido expandible */}
         {isExpanded && (
           <Box padding="medium" border="standard" borderRadius="normal">
             {renderRequirements()}
           </Box>
         )}
 
-        {/* Modales */}
         {editingRequirement && (
           <EditRequirementModal
             requirement={editingRequirement}

@@ -10,44 +10,63 @@ import {
     DonutChart,
     Lozenge,
     Inline,
-    ButtonGroup
+    ButtonGroup,
+    Badge,
+    ModalTransition,
+    Modal,
+    ModalHeader,
+    ModalBody,
+    ModalFooter,
+    Stack
 } from '@forge/react';
 import { invoke } from "@forge/bridge";
 
 const STATUS_APPEARANCE = {
     Validated: 'success',
     pending_validation: 'inprogress',
+    Unfulfilled: 'removed',
+    validated_with_risk: 'new',
+    accept_risk: 'new',
     noStatus: 'moved',
     unknown: 'default'
 };
 
+/**
+ * Component to display all the details of a catalog, including its requirements and issues linked to it.
+ * It fetches the data from the server and displays it in a structured format.
+ * It also provides filtering options for the requirements based on their status.
+ */
 const CatalogDetailPage = ({ catalogId, history }) => {
     const [catalog, setCatalog] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [issues, setIssues] = useState([]);
-    const [filterSelected, setFilterSelected] = useState('all');
-    // En la sección de estados añade
     const [selectedFilter, setSelectedFilter] = useState('all');
-
-
+    const [showMotivesModal, setShowMotivesModal] = useState(false);
+    const [selectedRequirement, setSelectedRequirement] = useState(null);
 
 
     // Memoized data calculations
-    const { progress, reqsValidated, reqsWithoutUS, reqsPendingValidation } = useMemo(() => {
+    const { progress, reqsValidated, reqsWithoutUS, reqsPendingValidation, reqsUnfilfilled, reqsValidatedWithRisk } = useMemo(() => {
         if (!catalog?.requirements) return {};
-
+        // From the catalog selected, we calculate the requirements stats based on their status
         const requirementStats = catalog.requirements.reduce((acc, req) => {
             const hasIssues = req.issuesLinked.length > 0;
             const hasPending = req.issuesLinked.some(issue => issue.status === 'pending_validation');
-
+            const hasUnfulfilled = req.issuesLinked.some(issue => issue.status === 'Unfulfilled');
+            let isValidatedWithRisk = false;
+            if (req.issuesLinked.some(issue => issue.status === 'accept_risk') &&
+                req.issuesLinked.every(issue => issue.status === 'Validated' || issue.status === 'accept_risk')) {
+                isValidatedWithRisk = 'validated_with_risk';
+            }
             if (!hasIssues) acc.reqsWithoutUS.push(req);
+            else if (hasUnfulfilled) acc.reqsUnfilfilled.push(req);
             else if (hasPending) acc.reqsPendingValidation.push(req);
+            else if (isValidatedWithRisk) acc.reqsValidatedWithRisk.push(req);
             else acc.reqsValidated.push(req);
 
             return acc;
-        }, { reqsValidated: [], reqsWithoutUS: [], reqsPendingValidation: [] });
-
+        }, { reqsValidated: [], reqsWithoutUS: [], reqsPendingValidation: [], reqsUnfilfilled: [], reqsValidatedWithRisk: [] });
         const completed = requirementStats.reqsValidated.length;
         const total = catalog.requirements.length;
         const progress = total > 0 ? (completed / total) * 100 : 0;
@@ -55,6 +74,7 @@ const CatalogDetailPage = ({ catalogId, history }) => {
         return { ...requirementStats, progress };
     }, [catalog]);
 
+    // Fetch catalog data and linked issues
     const fetchCatalogData = useCallback(async () => {
         try {
             const [catalogResult, issuesResult] = await Promise.all([
@@ -78,7 +98,7 @@ const CatalogDetailPage = ({ catalogId, history }) => {
                 ...catalogResult,
                 requirements: catalogResult.requirements || []
             });
-            setIssues(processedIssues);
+            setIssues(processedIssues.filter(issue => issue.res.length > 0));
         } catch (err) {
             setError(err.message);
         } finally {
@@ -86,6 +106,7 @@ const CatalogDetailPage = ({ catalogId, history }) => {
         }
     }, [catalogId]);
 
+    // Fetch data when the component mounts or catalogId changes
     useEffect(() => {
         if (catalogId) fetchCatalogData();
     }, [catalogId, fetchCatalogData]);
@@ -96,6 +117,20 @@ const CatalogDetailPage = ({ catalogId, history }) => {
         </Lozenge>
     ), []);
 
+    const determinateStatus = useCallback((issuesLinked) => {
+        if (!issuesLinked?.length) return 'noStatus';
+        if (issuesLinked.some(issue => issue.status === 'accept_risk') &&
+            issuesLinked.every(issue => issue.status === 'Validated' || issue.status === 'accept_risk')) {
+            return 'validated_with_risk';
+        }
+        if (issuesLinked.some(issue => issue.status === 'Unfulfilled')) return 'Unfulfilled';
+        if (issuesLinked.some(issue => issue.status === 'pending_validation')) return 'pending_validation';
+        if (issuesLinked.every(issue => issue.status === 'Validated')) return 'Validated';
+        return 'Unknown';
+    }, []);
+
+
+    // Format the list of issues linked to a requirement
     const formatIssuesList = useCallback((issues) => {
         if (!issues?.length) return 'N/A';
 
@@ -109,23 +144,27 @@ const CatalogDetailPage = ({ catalogId, history }) => {
         ));
     }, []);
 
-        // Modifica el memo de filteredRequirements
-        const filteredRequirements = useMemo(() => {
-            if (!catalog?.requirements) return [];
-    
-            switch (selectedFilter) {
-                case 'validated':
-                    return reqsValidated || [];
-                case 'pending':
-                    return reqsPendingValidation || [];
-                case 'no-link':
-                    return reqsWithoutUS || [];
-                default:
-                    return catalog.requirements;
-            }
-        }, [selectedFilter, catalog, reqsValidated, reqsPendingValidation, reqsWithoutUS]);
+    const filteredRequirements = useMemo(() => {
+        if (!catalog?.requirements) return [];
 
-    // Memoized table configurations
+        switch (selectedFilter) {
+            case 'validated':
+                const reqs = []
+                reqs.push(...reqsValidated);
+                reqs.push(...reqsValidatedWithRisk);
+                return reqs;
+            case 'pending':
+                return reqsPendingValidation || [];
+            case 'no-link':
+                return reqsWithoutUS || [];
+            case 'unfulfilled':
+                return reqsUnfilfilled || [];
+            default:
+                return catalog.requirements;
+        }
+    }, [selectedFilter, catalog, reqsValidated, reqsPendingValidation, reqsWithoutUS]);
+
+    // On calcule the rows for the tables based on the issues and requirements
     const { tableRowsUs, tableRows } = useMemo(() => {
         const usRows = issues.map(({ issueKey, res }) => ({
             cells: [
@@ -149,7 +188,6 @@ const CatalogDetailPage = ({ catalogId, history }) => {
                 }
             ]
         }));
-        const requirements = ''
         const reqRows = filteredRequirements?.map(req => ({
             cells: [
                 { content: req.id },
@@ -164,13 +202,26 @@ const CatalogDetailPage = ({ catalogId, history }) => {
                 { content: req.correlation?.join(', ') || 'N/A' },
                 {
                     content: getStatusLozenge(
-                        req.issuesLinked.length
-                            ? req.issuesLinked.some(i => i.status === 'pending_validation')
-                                ? 'pending_validation'
-                                : 'Validated'
-                            : 'noStatus',
-                        req.issuesLinked.length ? 'Linked' : 'No US'
+                        determinateStatus(req.issuesLinked),
+                        determinateStatus(req.issuesLinked)
                     )
+                },
+                {
+                    content: req.issuesLinked.some(issue =>
+                        issue.status === 'Unfulfilled' ||
+                        issue.status === 'validated_with_risk' ||
+                        issue.status === 'accept_risk'
+                    ) ? (
+                        <Button
+                            appearance="link"
+                            onClick={() => {
+                                setSelectedRequirement(req);
+                                setShowMotivesModal(true);
+                            }}
+                        >
+                            Press
+                        </Button>
+                    ) : "N/A"
                 }
             ]
         })) || [];
@@ -178,11 +229,20 @@ const CatalogDetailPage = ({ catalogId, history }) => {
         return { tableRowsUs: usRows, tableRows: reqRows };
     }, [issues, filteredRequirements, getStatusLozenge, formatIssuesList]);
 
+
+
+    // Declaration of the configuration of the donut chart
     const donutData = useMemo(() => [
-        ['inprogress', 'Req. validated', reqsValidated?.length || 0],
-        ['done', 'Req. without US', reqsWithoutUS?.length || 0],
-        ['todo', 'Req. pending validation', reqsPendingValidation?.length || 0],
-    ], [reqsValidated, reqsWithoutUS, reqsPendingValidation]);
+        ['validated', 'Req. validated', reqsValidated?.length || 0],
+        ['dowithoutUS', 'Req. without US', reqsWithoutUS?.length || 0],
+        ['pending', 'Req. pending validation', reqsPendingValidation?.length || 0],
+        ['unfulfilled', 'Req. unfulfilled', reqsUnfilfilled?.length || 0],
+        ['validated_with_risk', 'Req. validated with risk', reqsValidatedWithRisk?.length || 0]
+    ], [reqsValidated, reqsWithoutUS, reqsPendingValidation, reqsUnfilfilled, reqsValidatedWithRisk]);
+
+    //-------------------------------------
+    // Code REACT
+    //-------------------------------------
 
     if (error) {
         return (
@@ -195,11 +255,22 @@ const CatalogDetailPage = ({ catalogId, history }) => {
     if (!loading && !catalog) {
         return (
             <Box padding="medium">
-                <Text size="xlarge">Catálogo no encontrado</Text>
+                <Text size="xlarge">Catalog not found</Text>
             </Box>
         );
     }
-
+    const tableStyles = {
+        container: {
+          minHeight: '500px',
+          overflow: 'auto'
+        },
+        header: {
+          position: 'sticky',
+          top: 0,
+          backgroundColor: '#FFFFFF',
+          zIndex: 1
+        }
+      };
     return (
         <Box padding="medium">
             <Button
@@ -208,11 +279,11 @@ const CatalogDetailPage = ({ catalogId, history }) => {
                 onClick={history.goBack}
                 marginBottom="large"
             >
-                Volver
+                Return
             </Button>
 
             {loading ? (
-                <Text>Cargando...</Text>
+                <Text>Loading...</Text>
             ) : (
                 <>
                     <CatalogHeader catalog={catalog} />
@@ -223,6 +294,8 @@ const CatalogDetailPage = ({ catalogId, history }) => {
                             reqsValidated={reqsValidated}
                             reqsWithoutUS={reqsWithoutUS}
                             reqsPendingValidation={reqsPendingValidation}
+                            reqsUnfilfilled={reqsUnfilfilled}
+                            reqsValidatedWithRisk={reqsValidatedWithRisk}
                             donutData={donutData}
                         />
                     </Box>
@@ -237,56 +310,71 @@ const CatalogDetailPage = ({ catalogId, history }) => {
                             head={HEADERS.issues}
                             rowsPerPage={5}
                             emptyView={
-                                <Text color="subtlest">Este catálogo no tiene requisitos registrados</Text>
+                                <Text color="subtlest">This catalog doesn't have any requirements linked</Text>
                             }
                         />
                     </Box>
 
-                    <Box marginBottom="xlarge">
-                                <Text size="large" weight="bold">
-                                    Requisitos ({filteredRequirements.length})
-                                </Text>
-                                <Text></Text>
-                                <ButtonGroup>
-                                    <Button
-                                        appearance={selectedFilter === 'all' ? 'primary' : 'default'}
-                                        onClick={() => setSelectedFilter('all')}
-                                    >
-                                        Todos ({catalog?.requirements?.length || 0})
-                                    </Button>
-                                    <Button
-                                        appearance={selectedFilter === 'validated' ? 'primary' : 'default'}
-                                        onClick={() => setSelectedFilter('validated')}
-                                    >
-                                        Validados ({reqsValidated?.length || 0})
-                                    </Button>
-                                    <Button
-                                        appearance={selectedFilter === 'pending' ? 'primary' : 'default'}
-                                        onClick={() => setSelectedFilter('pending')}
-                                    >
-                                        Pendientes ({reqsPendingValidation?.length || 0})
-                                    </Button>
-                                    <Button
-                                        appearance={selectedFilter === 'no-link' ? 'primary' : 'default'}
-                                        onClick={() => setSelectedFilter('no-link')}
-                                    >
-                                        Sin US ({reqsWithoutUS?.length || 0})
-                                    </Button>
-                                    </ButtonGroup>
+                    <Box
+                        marginBottom="xlarge"
+                        xcss={tableStyles.container}
+                    >
+                        <Text size="large" weight="bold">
+                            Requirements ({filteredRequirements.length})
+                        </Text>
+                        <Text></Text>
+                        <ButtonGroup>
+                            <Button
+                                appearance={selectedFilter === 'all' ? 'primary' : 'default'}
+                                onClick={() => setSelectedFilter('all')}
+                            >
+                                All ({catalog?.requirements?.length || 0})
+                            </Button>
+                            <Button
+                                appearance={selectedFilter === 'validated' ? 'primary' : 'default'}
+                                onClick={() => setSelectedFilter('validated')}
+                            >
+                                Validated ({reqsValidated?.length + reqsValidatedWithRisk?.length || 0})
+                            </Button>
+                            <Button
+                                appearance={selectedFilter === 'pending' ? 'primary' : 'default'}
+                                onClick={() => setSelectedFilter('pending')}
+                            >
+                                Pending ({reqsPendingValidation?.length || 0})
+                            </Button>
+                            <Button
+                                appearance={selectedFilter === 'unfulfilled' ? 'primary' : 'default'}
+                                onClick={() => setSelectedFilter('unfulfilled')}
+                            >
+                                Unfulfilled ({reqsUnfilfilled?.length || 0})
+                            </Button>
+                            <Button
+                                appearance={selectedFilter === 'no-link' ? 'primary' : 'default'}
+                                onClick={() => setSelectedFilter('no-link')}
+                            >
+                                Without US ({reqsWithoutUS?.length || 0})
+                            </Button>
+                        </ButtonGroup>
 
-                            <DynamicTable
-                                rows={tableRows}
-                                head={HEADERS.requirements}
-                                rowsPerPage={5}
-                                emptyView={
-                                    <Text color="subtlest">
-                                        {selectedFilter === 'all'
-                                            ? 'Este catálogo no tiene requisitos registrados'
-                                            : `No hay requisitos en la categoría ${selectedFilter}`
-                                        }
-                                    </Text>
-                                }
+                        <DynamicTable
+                            rows={tableRows}
+                            head={HEADERS.requirements}
+                            rowsPerPage={5}
+                            emptyView={
+                                <Text color="subtlest">
+                                    {selectedFilter === 'all'
+                                        ? 'This catalog doesn\'t have any requirements'
+                                        : `There is no requirements for this category ${selectedFilter}`
+                                    }
+                                </Text>
+                            }
+                        />
+                        {showMotivesModal && (
+                            <MotivesUnfullfilmentModal
+                                requirement={selectedRequirement}
+                                onClose={() => setShowMotivesModal(false)}
                             />
+                        )}
                     </Box>
                 </>
             )}
@@ -298,35 +386,38 @@ const CatalogDetailPage = ({ catalogId, history }) => {
 const CatalogHeader = React.memo(({ catalog }) => (
     <Box marginBottom="xlarge">
         <Text size="large" weight="bold">{catalog.title}</Text>
+        <Text></Text>
         <Box marginTop="medium">
-            <Text weight="bold">Descripción:</Text>
+            <Text weight="bold">Description:</Text>
             <Text></Text>
             <Text color="subtlest">{catalog.description}</Text>
             <Text></Text>
         </Box>
         <Inline spread="space-between" marginTop="medium">
-            <Tag text={catalog.prefix} appearance="primary" />
-            <User accountId={catalog.userId} />
-            <Text>Creación: {catalog.dateCreation}</Text>
-            <Text>Actualizado: {catalog.dateUpdate}</Text>
+            <Text weight="bold">Prefix: <Text><Tag text={catalog.prefix} appearance="primary" /></Text></Text>
+            <Text weight="bold">Owner:</Text><User accountId={catalog.userId} />
+            <Text><Text weight="bold">Creation date:</Text> {catalog.dateCreation}</Text>
+            <Text><Text weight="bold">Last modification:</Text> {catalog.dateUpdate}</Text>
         </Inline>
     </Box>
 ));
 
 const ComplianceProgress = React.memo(({ progress, donutData, ...stats }) => (
     <Box>
-        <Text weight="bold" marginBottom="medium">Estado de cumplimiento</Text>
+        <Text weight="bold" marginBottom="medium">Compliance Status</Text>
         <Inline spread="space-between">
             <Box>
-                <Text>Validados: {stats.reqsValidated.length}</Text>
-                <Text>Sin US: {stats.reqsWithoutUS.length}</Text>
-                <Text>Pendientes: {stats.reqsPendingValidation.length}</Text>
+                <Text>Requirements validated: <Badge>{stats.reqsValidated.length}</Badge></Text>
+                <Text>Requirements validated with risk: <Badge>{stats.reqsValidatedWithRisk.length}</Badge></Text>
+                <Text>Requierements without US: <Badge>{stats.reqsWithoutUS.length}</Badge></Text>
+                <Text>Requirements pending validation: <Badge>{stats.reqsPendingValidation.length}</Badge></Text>
+                <Text>Requirements unfulfilled: <Badge>{stats.reqsUnfilfilled.length}</Badge></Text>
             </Box>
         </Inline>
 
         <DonutChart
             data={donutData}
-            title="Progreso de verificación"
+            title="Verification progess"
             colorAccessor={0}
             labelAccessor={1}
             valueAccessor={2}
@@ -334,41 +425,76 @@ const ComplianceProgress = React.memo(({ progress, donutData, ...stats }) => (
     </Box>
 ));
 
-const DataTableSection = React.memo(({ title, rows, head, emptyMessage }) => (
-    <Box marginBottom="xlarge">
-        <Text size="large" weight="bold" marginBottom="medium">{title}</Text>
-        <DynamicTable
-            rows={rows}
-            head={head}
-            rowsPerPage={10}
-            emptyView={<Text color="subtlest">{emptyMessage}</Text>}
-        />
-    </Box>
-));
-
-// Configuración de headers
+// Headers configuration
 const HEADERS = {
     issues: {
         cells: [
             { key: "issueId", content: "Issue ID", isSortable: true },
-            { key: "linkedReqs", content: "Requisitos Vinculados", isSortable: false }
+            { key: "linkedReqs", content: "Requirements linked", isSortable: false }
         ]
     },
     requirements: {
         cells: [
             { key: "id", content: "ID", isSortable: true },
-            { key: "title", content: "Título", isSortable: false },
-            { key: "summary", content: "Resumen", shouldTruncate: true },
-            { key: "type", content: "Tipo", shouldTruncate: true },
-            { key: "category", content: "Categoría", shouldTruncate: true },
-            { key: "important", content: "Importancia", isSortable: true },
-            { key: "validation", content: "Validación", shouldTruncate: true },
+            { key: "title", content: "Title", isSortable: false },
+            { key: "summary", content: "Description", shouldTruncate: true },
+            { key: "type", content: "Type", shouldTruncate: true },
+            { key: "category", content: "Category", shouldTruncate: true },
+            { key: "important", content: "Importance", isSortable: true },
+            { key: "validation", content: "Validation", shouldTruncate: true },
             { key: "linkedIssues", content: "Issues Vinculados" },
-            { key: "dependencies", content: "Dependencias", isSortable: true },
-            { key: "correlation", content: "Correlación", isSortable: true },
-            { key: "status", content: "Estado" }
+            { key: "dependencies", content: "Dependencies", isSortable: true },
+            { key: "correlation", content: "Correlation", isSortable: true },
+            { key: "status", content: "Status" },
+            { key: "motives", content: "Motives" }
         ]
     }
+};
+
+const MotivesUnfullfilmentModal = ({ requirement, onClose }) => {
+    const motives = requirement?.issuesLinked?.filter(issue =>
+        ['Unfulfilled', 'validated_with_risk', 'accept_risk'].includes(issue.status)
+        || []);
+
+    return (
+        <ModalTransition>
+            <Modal onClose={onClose}>
+                <ModalHeader>
+                    <Text size="xlarge" weight="bold" >Motives - {requirement?.id} {requirement?.title}</Text>
+                </ModalHeader>
+
+                <ModalBody>
+                    
+                    <Text color="subtlest"> {requirement?.validation}</Text>
+                    <Text color="subtlest" weight="bold">Motives for the status of the requirement</Text>
+                    <Text></Text>
+                    <Stack alignInline="start" space="space.200">
+                        {motives.length > 0 ? (
+                            motives
+                                .filter(issue => issue.explanation) // Filter out issues with empty explanation
+                                .map((issue, index) => (
+                                    <Box key={index} padding="small" border="standard" marginBottom="small">
+                                        <Inline space="space.200">
+                                            <Lozenge appearance={STATUS_APPEARANCE[issue.status] || 'default'}>
+                                                {issue.status}
+                                            </Lozenge>
+                                            <Text color="subtlest" size="small">{issue.issueKey}</Text>
+                                        </Inline>
+                                        <Text marginTop="small">{issue.explanation}</Text>
+                                    </Box>
+                                ))
+                        ) : (
+                            <Text color="subtlest">No se encontraron motivos registrados</Text>
+                        )}
+                    </Stack>
+                </ModalBody>
+
+                <ModalFooter>
+                    <Button onClick={onClose}>Close</Button>
+                </ModalFooter>
+            </Modal>
+        </ModalTransition>
+    );
 };
 
 export default React.memo(CatalogDetailPage);

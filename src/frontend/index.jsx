@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import ForgeReconciler, { Box, Text } from "@forge/react";
 import { invoke, view } from "@forge/bridge";
-// Importar componentes
 import CatalogForm from './components/CatalogForm';
 import CatalogList from './components/CatalogList';
 import Notification from './components/Notification';
@@ -9,7 +8,7 @@ import RequirementModal from './components/RequirementModal';
 import AllRequirementsList from './components/AllRequirementsList';
 import CatalogDetailPage from "./components/CatalogDetailPage/Index";
 
-// Configuración inicial
+// Initial form state for the catalog and requirement forms
 const INITIAL_FORM_STATE = {
   catalogTitle: '',
   catalogDesc: '',
@@ -23,33 +22,37 @@ const INITIAL_FORM_STATE = {
   reqCorrelation: []
 };
 
-// Componente principal
+/**
+ * Main component for the Forge app.
+ * It handles the loading of catalogs, creating and deleting catalogs and requirements,
+ * and displaying notifications.
+ * It also handles the routing of the app and the rendering of different pages.
+ * It manages the pages of creation catalogs, requirements and all requirements.
+ */
 const App = () => {
-  // Estados principales
   const [catalogs, setCatalogs] = useState([]);
   const [selectedCatalog, setSelectedCatalog] = useState(null);
   const [selectedPage, setSelectedPage] = useState('');
   const [notification, setNotification] = useState({ type: '', message: '' });
   const [formState, setFormState] = useState(INITIAL_FORM_STATE);
   
-  // Refs y estado de montaje
   const historyRef = useRef(null);
   const isMountedRef = useRef(true);
 
-  // Cargar catálogos memoizado
   const loadCatalogs = useCallback(async () => {
     try {
       const data = await invoke('getAllCatalogs');
       setCatalogs(data);
     } catch (err) {
-      showNotification('error', `Error cargando catálogos: ${err.message}`);
+      showNotification('error', `Error loading catalogues: ${err.message}`);
     }
   }, []);
 
-  // Efecto principal de inicialización
+  // Initialize the app and load catalogs
   useEffect(() => {
     const initializeApp = async () => {
       try {
+        // Create the global "history" from the dependency "view" of @forge/bridge
         const [history, context] = await Promise.all([
           view.createHistory(),
           view.getContext()
@@ -57,7 +60,7 @@ const App = () => {
 
         if (!isMountedRef.current) return;
 
-        // Configurar historial
+        // Handler for page changes that will be in the listener
         const handleHistoryChange = (location) => {
           const newPath = location.pathname.replace(/^\//, '');
           setSelectedPage(newPath);
@@ -68,22 +71,20 @@ const App = () => {
         historyRef.current = history;
         history.listen(handleHistoryChange);
         handleHistoryChange(history.location);
-        // Carga inicial
         await loadCatalogs();
       } catch (error) {
-        console.error('Error de inicialización:', error);
-        showNotification('error', 'Error inicializando la aplicación');
+        console.error('Initialisation error:', error);
+        showNotification('error', 'Error initialising the application');
       }
     };
 
     initializeApp();
-
     return () => {
       isMountedRef.current = false;
     };
   }, [loadCatalogs]);
 
-  // Manejo de catálogos y requisitos
+  // Handle catalog actions (create, delete, etc.)
   const handleCatalogAction = async (action, params, successMessage) => {
     try {
       await invoke(action, params);
@@ -94,6 +95,7 @@ const App = () => {
     }
   };
 
+  // Create a new catalog
   const createCatalog = async () => {
     const context = await view.getContext();
     await handleCatalogAction(
@@ -104,24 +106,28 @@ const App = () => {
         prefix: formState.catalogPrefix,
         userId: context.accountId
       },
-      'Catálogo creado!'
+      'Catalog created!'
     );
     setFormState(prev => ({ ...prev, ...INITIAL_FORM_STATE }));
   };
 
+  // Delete a catalog
   const deleteCatalog = async (catalogId) => {
-    if (confirm('¿Eliminar este catálogo y sus requisitos?')) {
-      await handleCatalogAction('deleteCatalog', { catalogId }, 'Catálogo eliminado');
+    if (confirm('Delete this catalogue and its requirements?')) {
+      await handleCatalogAction('deleteCatalog', { catalogId }, 'Catalogue deleted');
     }
   };
 
+  // Delete a requirement
   const deleteRequirement = async (catalogId, requirementId) => {
-    if (confirm('¿Eliminar este requisito?')) {
-      await handleCatalogAction('deleteRequirement', { catalogId, requirementId }, 'Requisito eliminado');
+    if (confirm('Remove this requirement?')) {
+      await handleCatalogAction('deleteRequirement', { catalogId, requirementId }, 'Requirement removed');
+      return true;
     }
+    return false
   }
 
-  // Manejo de requisitos
+  // Update a requirement
   const handleRequirementAction = async (action, params, successMessage) => {
     try {
       const context = await view.getContext();
@@ -144,6 +150,7 @@ const App = () => {
     }
   };
 
+  // Add a new requirement to the selected catalog
   const addRequirement = async () => {
     await handleRequirementAction(
       'addRequirement',
@@ -152,26 +159,26 @@ const App = () => {
         prefix: selectedCatalog.prefix,
         formState
       },
-      'Requisito añadido'
+      'Requirement added'
     );
     setFormState(prev => ({ ...prev, ...INITIAL_FORM_STATE }));
   };
 
+  // Update an existing requirement
   const updateRequirement = async (catalogId, requirementId, updates) => {
     await handleRequirementAction(
       'updateRequirement',
       { catalogId, requirementId, updates },
-      'Requisito actualizado'
+      'Requirement updated'
     );
   };
 
-  // Notificaciones
+  // Notifications
   const showNotification = (type, message) => {
     setNotification({ type, message });
     setTimeout(() => setNotification({ type: '', message: '' }), 5000);
   };
 
-  // Renderizado condicional
   const renderPageContent = () => {
     if (selectedPage.startsWith('catalogues/')) {
       return <CatalogDetailPage catalogId={selectedPage.split('/')[1]} history={historyRef.current}/>;
@@ -187,6 +194,7 @@ const App = () => {
               onDelete={deleteCatalog}
               onUpdateRequirement={updateRequirement}
               history={historyRef.current}
+              onUpdateCsv={loadCatalogs}
             />
             {selectedCatalog && (
               <RequirementModal
@@ -221,6 +229,7 @@ const App = () => {
               onDelete={deleteCatalog}
               onUpdateRequirement={updateRequirement}
               history={historyRef.current}
+              onUpdateCsv={loadCatalogs}
             />
             {selectedCatalog && (
               <RequirementModal
@@ -235,14 +244,14 @@ const App = () => {
         );
       
       default:
-        return <Text>Página no encontrada</Text>;
+        return <Text>Page not found</Text>;
     }
   };
 
   return (
     <Box padding="medium">
       {!historyRef.current ? (
-        <Text>Cargando...</Text>
+        <Text>Loading...</Text>
       ) : (
         <>
           <Notification {...notification} />

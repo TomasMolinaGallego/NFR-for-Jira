@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { Modal, ModalHeader, ModalBody, ModalFooter, Form, Text, Textfield, TextArea, Button } from '@forge/react';
+
+/**
+ * Component to edit a requirement of a catalog.
+ * It allows editing the requirement's title, description, type, validation method, importance, correlation, dependencies and category.
+ */
 const EditRequirementModal = ({ requirement, onClose, onSave }) => {
   const [editedData, setEditedData] = useState({});
 
@@ -18,48 +23,50 @@ const EditRequirementModal = ({ requirement, onClose, onSave }) => {
     }
   }, [requirement]);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = () => {
     onSave(editedData);
   };
 
   return (
     <Modal onClose={onClose}>
       <ModalHeader>
-        <Text size="xlarge">Editar Requisito</Text>
+        <Text size="xlarge">Edit Requirement</Text>
       </ModalHeader>
       <ModalBody>
         <Form onSubmit={handleSubmit}>
-          <Text>Título</Text>
+          <Text>Title</Text>
           <Textfield
             value={editedData.title || ''}
             onChange={e => setEditedData(prev => ({ ...prev, title: e.target.value }))}
             isRequired
           />
-          <Text>Descripción</Text>
+          <Text>Description</Text>
           <TextArea
-            label="Descripción"
+            label="Description"
             value={editedData.description || ''}
             onChange={e => setEditedData(prev => ({ ...prev, description: e.target.value }))}
             isRequired
           />
 
-          <Text>Importancia</Text>
+          <Text>Importance</Text>
           <Textfield
-            label="Importancia"
+            label="Importance"
             type="number"
             value={editedData.important || 0}
+            min={0}
+            max={100}
             onChange={e => setEditedData(prev => ({ ...prev, important: Number(e.target.value) }))}
             isRequired
           />
 
-          <Text>Tipo</Text>
+          <Text>Type</Text>
           <Textfield
-            label="Tipo"
+            label="Type"
             value={editedData.type || ''}
             onChange={e => setEditedData(prev => ({ ...prev, type: e.target.value }))}
             isRequired
           />
-          <Text>Categoria</Text>
+          <Text>Category</Text>
           <Textfield
             label="Category"
             value={editedData.category || ''}
@@ -67,25 +74,25 @@ const EditRequirementModal = ({ requirement, onClose, onSave }) => {
             isRequired
           />
 
-          <Text>Validación</Text>
+          <Text>Method of validation</Text>
           <Textfield
-            label="Validation"
+            label="Method of validation"
             value={editedData.validation || ''}
             onChange={e => setEditedData(prev => ({ ...prev, validation: e.target.value }))}
             isRequired
           />
 
 
-          <Text>Correlation</Text>
+          <Text>Requirement correlated</Text>
           <Textfield
-            label="Category"
+            label="Correlation"
             value={editedData.correlation || ''}
             onChange={e => setEditedData(prev => ({ ...prev, correlation: e.target.value }))}
           />
 
-          <Text>Dependencias</Text>
+          <Text>Requirements dependency</Text>
           <Textfield
-            label="Category"
+            label="dependencies"
             value={editedData.dependencies || ''}
             onChange={e => setEditedData(prev => ({ ...prev, dependencies: e.target.value }))}
           />
@@ -93,8 +100,8 @@ const EditRequirementModal = ({ requirement, onClose, onSave }) => {
         </Form>
       </ModalBody>
       <ModalFooter>
-        <Button appearance="subtle" onClick={onClose}>Cancelar</Button>
-        <Button appearance="primary" onClick={handleSubmit}>Guardar Cambios</Button>
+        <Button appearance="subtle" onClick={onClose}>Cancel</Button>
+        <Button appearance="primary" onClick={handleSubmit}>Save changes</Button>
       </ModalFooter>
     </Modal>
   );

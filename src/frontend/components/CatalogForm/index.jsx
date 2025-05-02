@@ -1,12 +1,15 @@
 import React from 'react';
 import { Form, Textfield, TextArea, Button, Text, Box } from '@forge/react';
 
+/**
+ * Form component to create a new catalog.
+ * It includes fields for the catalog title, description, and prefix.
+ */
 const CatalogForm = ({ formState, onFormChange, onSubmit }) => (
   <Form onSubmit={onSubmit}>
     <Box padding="medium">
-
       <Box marginTop="medium" marginBottom="medium">
-        <Text>Título del catálogo</Text>
+        <Text>Catalogue title</Text>
         <Textfield
           label="Título del Catálogo"
           value={formState.catalogTitle}
@@ -18,7 +21,7 @@ const CatalogForm = ({ formState, onFormChange, onSubmit }) => (
       </Box>
 
       <Box marginBottom="5px">
-        <Text>Descripción del catálogo</Text>
+        <Text>Catalogue description</Text>
         <TextArea
           label="Descripción"
           value={formState.catalogDesc}
@@ -29,7 +32,7 @@ const CatalogForm = ({ formState, onFormChange, onSubmit }) => (
       </Box>
 
       <Box marginBottom="5px">
-        <Text>Prefijo del catálogo</Text>
+        <Text>Catalogue prefix</Text>
         <TextArea
           label="Prefijo"
           isRequired
@@ -41,7 +44,7 @@ const CatalogForm = ({ formState, onFormChange, onSubmit }) => (
       </Box>
           <Text></Text>
       <Button type="submit" appearance="primary">
-        Crear Catálogo
+        Create catalogue
       </Button>
     </Box>
   </Form>

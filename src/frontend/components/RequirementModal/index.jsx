@@ -9,19 +9,22 @@ import {
   Textfield,
   TextArea,
   Button,
-  List,
-  ListItem,
   Text,
-  Box,
 } from '@forge/react';
 import SearchableDropdown from '../SearchableDropdown';
 import Notification from '../Notification';
+
+/**
+ * Component to create a new requirement for a catalog with a form in a modal.
+ * It includes fields for the requirement title, description, type, validation method, importance, correlation, dependencies and category.
+ * It also includes a notification component to display success or error messages.
+ */
 const RequirementModal = ({ catalog, formState, onFormChange, onSubmit, onClose }) => {
-  // For some reason this doesn't work
-  //const [allRequirements, setAllRequirements] = useState([]);
   const [allRequirements, setAllRequirements] = useState([]);
   const [notification, setNotification] = useState({ type: '', message: '' });
 
+  // Calculate the ID of the last requirement based on the catalog prefix and the last number in the ID.
+  // The ID format is expected to be "prefix-number", e.g., "CAT-1", "CAT-2", etc.
   function getIdLastRequirement() {
     if (catalog && catalog.requirements && catalog.requirements.length > 0) {
       const lastRequirement = catalog.requirements[catalog.requirements.length - 1].id;
@@ -32,6 +35,7 @@ const RequirementModal = ({ catalog, formState, onFormChange, onSubmit, onClose 
     return catalog.prefix + "-0"; // Default value if no requirements exist
   }
 
+  // Set the ID of the new requirement in the form state when the catalog changes.
   useEffect(() => {
     if (catalog) {
       setAllRequirements(Array.isArray(catalog.requirements) ? catalog.requirements : []);
@@ -44,62 +48,66 @@ const RequirementModal = ({ catalog, formState, onFormChange, onSubmit, onClose 
       {catalog && (
         <Modal onClose={onClose}>
           <ModalHeader>
-            <Text size="xlarge">Gestión de Requisitos: {catalog.title}</Text>
+            <Text size="xlarge">Requirements Management: {catalog.title}</Text>
           </ModalHeader>
 
           <ModalBody>
             <Form>
-              <Text>Título del Requisito</Text>
+              <Text>Title of Requirement</Text>
               <Textfield
-                label="Título del Requisito"
+                label="Title of Requirement"
                 value={formState.reqTitle}
                 onChange={e => onFormChange(prev => ({ ...prev, reqTitle: e.target.value }))}
                 isRequired
               />
 
-              <Text>Descripción del Requisito</Text>
+              <Text>Description of the Requirement</Text>
               <TextArea
-                label="Descripción"
+                label="Description of the Requirement"
                 value={formState.reqDesc}
                 onChange={e => onFormChange(prev => ({ ...prev, reqDesc: e.target.value }))}
                 isRequired
               />
 
-              <Text>Tipo del Requisito</Text>
+              <Text>Type of Requirement</Text>
               <Textfield
-                label="Tipo del requisito"
+                label="Type of Requirement"
                 value={formState.reqType}
                 onChange={e => onFormChange(prev => ({ ...prev, reqType: e.target.value }))}
                 isRequired
               />
 
-              <Text>Categoría del Requisito</Text>
+              <Text>Requirement Category</Text>
               <Textfield
-                label="Categoría del requisito"
+                label="Requirement Category"
                 value={formState.reqCategory}
                 onChange={e => onFormChange(prev => ({ ...prev, reqCategory: e.target.value }))}
                 isRequired
               />
 
-              <Text>Importancia del Requisito (de 0 a 100)</Text>
+              <Text>Importance of the Requirement (from 0 to 100)</Text>
               <Textfield
                 type="number"
-                label="Importancia del requisito"
+                label="Importance of the Requirement"
+                min={0}
+                max={100}
+                minLength={1}
+                maxLength={3}
                 value={formState.reqImportant || 0}
                 onChange={e => onFormChange(prev => ({ ...prev, reqImportant: e.target.value }))}
                 isRequired
               />
 
-              <Text>Validación del Requisito</Text>
+              <Text>Method of validation</Text>
               <Textfield
-                label="Validación del requisito"
+                label="Method of validation"
                 value={formState.reqValidation}
                 onChange={e => onFormChange(prev => ({ ...prev, reqValidation: e.target.value }))}
               />
 
-              <Text>Buscador de reglas de Correlación (Se debe de seleccionar entre los distintos requisitos mostrados)</Text>
+              <Text>Correlation Rule Finder (Select from the different requirements shown)</Text>
               <SearchableDropdown
-                label="Selecciona requisitos correlacionados"
+                label="Select correlated requirements"
                 options={allRequirements}
                 selected={formState.reqCorrelation || []}
                 onSelect={(selected) =>
@@ -107,9 +115,9 @@ const RequirementModal = ({ catalog, formState, onFormChange, onSubmit, onClose 
                 }
               />
 
-              <Text>Buscador de Dependencias (Se debe de seleccionar entre los distintos requisitos mostrados)</Text>
+              <Text>Dependency Finder (Select from the different requirements shown)</Text>
               <SearchableDropdown
-                label="Selecciona dependencias"
+                label="Select dependencies"
                 options={allRequirements}
                 selected={formState.reqDependencies || []}
                 onSelect={(selected) =>
@@ -122,15 +130,15 @@ const RequirementModal = ({ catalog, formState, onFormChange, onSubmit, onClose 
           </ModalBody>
 
           <ModalFooter>
-            <Button onClick={onClose}>Cerrar</Button>
+            <Button onClick={onClose}>Close</Button>
             <Button
-              onClick={() => { onSubmit(); showSuccess('Requisito ' + getIdLastRequirement() + ' añadido') }}
+              onClick={() => { onSubmit(); showSuccess('Requirement ' + getIdLastRequirement() + ' added') }}
               appearance="primary"
               isDisabled={!formState.reqTitle.trim() || !formState.reqDesc.trim() || !formState.reqCategory.trim() 
                 ||!formState.reqType.trim() ||!formState.reqImportant.trim() ||!formState.reqValidation.trim()
               }
             >
-              Añadir Requisito
+              Add Requirement
             </Button>
           </ModalFooter>
         </Modal>

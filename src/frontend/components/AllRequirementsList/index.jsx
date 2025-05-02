@@ -4,14 +4,17 @@ import { invoke } from '@forge/bridge';
 import Card from '../Card';
 import RequirementSearch from '../RequirementSearch';
 
+/**
+ * Component to display requiremetnss from all catalogs.
+ * They can be display in form of list with all requirements or in a searcher .
+ */
 const AllRequirementsList = ({ onUpdateRequirement, onDeleteRequirement }) => {
   const [requirements, setRequirements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
-  const [toSynchronise, setToSynchronise] = useState(false);
 
-  // Función para cargar datos, memorizada para evitar recreaciones.
+  // On loading the component, we fetch all the requirements.
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -31,17 +34,31 @@ const AllRequirementsList = ({ onUpdateRequirement, onDeleteRequirement }) => {
     }
   }, []);
 
-  // Efecto que se ejecuta al montar el componente y cuando cambia toSynchronise.
   useEffect(() => {
     fetchData();
     }, []);
 
-  const handleDeleteRequirement = (catalogId, reqId) => {
-    setRequirements((prev) => prev.filter((req) => req.id !== reqId));
-    onDeleteRequirement(catalogId, reqId);
-    toSynchronise(true);
+  /**
+   * Handler to delete a requirement for the searcher and the list.
+   * @param {*} catalogId 
+   * @param {*} reqId 
+   */
+  const handleDeleteRequirement =  async(catalogId, reqId) => {
+    const flag = await onDeleteRequirement(catalogId, reqId);
+    if(flag === true) {
+      setRequirements((prev) => prev.filter((req) => req.id !== reqId));
+
+    }
   }
 
+
+  /**
+   * Handler to update a requirement for the searcher and the list.
+   * @param {*} catalogId
+   * @param {*} reqId
+   * @param {*} updatedData
+   * @returns
+   * */
   const handleUpdateRequirement = (catalogId, reqId, updatedData) => {
     setRequirements((prev) =>
       prev.map((req) => (req.id === reqId ? { ...req, ...updatedData } : req))
@@ -50,12 +67,16 @@ const AllRequirementsList = ({ onUpdateRequirement, onDeleteRequirement }) => {
   }
 
 
-  // Maneja el estado "buscando" llegado desde el componente RequirementSearch.
+  /**
+   * Handler to set the searcher and disable the list.
+   */
   const handleSearching = useCallback((searching) => {
     setIsSearching(searching);
   }, []);
 
+  // If the page is loading, we show a loading message.
   if (loading) return <Text>Loading requirements...</Text>;
+  // In case of some error
   if (error) return <Text color="danger">Error: {error}</Text>;
 
   return (
