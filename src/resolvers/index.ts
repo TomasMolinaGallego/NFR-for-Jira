@@ -18,8 +18,7 @@ const createNewCatalogData = (userId: string, title: string, description: string
   title,
   description,
   prefix,
-  requirements: [],
-  correlations: []
+  requirements: []
 });
 
 const saveCatalog = async (catalogData: any) => {
