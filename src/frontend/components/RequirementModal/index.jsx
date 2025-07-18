@@ -54,7 +54,7 @@ const RequirementModal = ({ catalog, formState, onFormChange, onSubmit, onClose 
           <ModalBody>
             <Form>
               <Text>Title of Requirement</Text>
-              <Textfield
+              <TextArea
                 label="Title of Requirement"
                 value={formState.reqTitle}
                 onChange={e => onFormChange(prev => ({ ...prev, reqTitle: e.target.value }))}
@@ -69,60 +69,13 @@ const RequirementModal = ({ catalog, formState, onFormChange, onSubmit, onClose 
                 isRequired
               />
 
-              <Text>Type of Requirement</Text>
-              <Textfield
-                label="Type of Requirement"
-                value={formState.reqType}
-                onChange={e => onFormChange(prev => ({ ...prev, reqType: e.target.value }))}
-                isRequired
-              />
-
-              <Text>Requirement Category</Text>
-              <Textfield
-                label="Requirement Category"
-                value={formState.reqCategory}
-                onChange={e => onFormChange(prev => ({ ...prev, reqCategory: e.target.value }))}
-                isRequired
-              />
-
               <Text>Importance of the Requirement (from 0 to 100)</Text>
               <Textfield
                 type="number"
                 label="Importance of the Requirement"
-                min={0}
-                max={100}
-                minLength={1}
-                maxLength={3}
-                value={formState.reqImportant || 0}
+                value={formState.reqImportant}
                 onChange={e => onFormChange(prev => ({ ...prev, reqImportant: e.target.value }))}
                 isRequired
-              />
-
-              <Text>Method of validation</Text>
-              <Textfield
-                label="Method of validation"
-                value={formState.reqValidation}
-                onChange={e => onFormChange(prev => ({ ...prev, reqValidation: e.target.value }))}
-              />
-
-              <Text>Correlation Rule Finder (Select from the different requirements shown)</Text>
-              <SearchableDropdown
-                label="Select correlated requirements"
-                options={allRequirements}
-                selected={formState.reqCorrelation || []}
-                onSelect={(selected) =>
-                  onFormChange(prev => ({ ...prev, reqCorrelation: selected }))
-                }
-              />
-
-              <Text>Dependency Finder (Select from the different requirements shown)</Text>
-              <SearchableDropdown
-                label="Select dependencies"
-                options={allRequirements}
-                selected={formState.reqDependencies || []}
-                onSelect={(selected) =>
-                  onFormChange(prev => ({ ...prev, reqDependencies: selected }))
-                }
               />
               <Notification {...notification} />
             </Form>
@@ -134,9 +87,7 @@ const RequirementModal = ({ catalog, formState, onFormChange, onSubmit, onClose 
             <Button
               onClick={() => { onSubmit(); showSuccess('Requirement ' + getIdLastRequirement() + ' added') }}
               appearance="primary"
-              isDisabled={!formState.reqTitle.trim() || !formState.reqDesc.trim() || !formState.reqCategory.trim() 
-                ||!formState.reqType.trim() ||!formState.reqImportant.trim() ||!formState.reqValidation.trim()
-              }
+              isDisabled={!formState.reqTitle.trim() || !formState.reqDesc.trim() ||!formState.reqImportant.trim() || isNaN(formState.reqImportant) || formState.reqImportant < 0 || formState.reqImportant > 100}
             >
               Add Requirement
             </Button>

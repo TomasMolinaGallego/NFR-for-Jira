@@ -26,17 +26,36 @@ const AllRequirementsList = ({ onUpdateRequirement, onDeleteRequirement }) => {
           catalogId: catalog.id,
         }))
       );
-      setRequirements(allReqs);
+      // Filter out container requirements and sort them here
+      const filteredAndSorted = allReqs
+        .filter(req => !req.isContainer)
+        .sort((a, b) => {
+          // Extract prefix and number for natural sort
+          const parseId = id => {
+        const match = id.match(/^([a-zA-Z\-]+)?(\d+)$/i);
+        if (match) {
+          return { prefix: match[1] || '', num: parseInt(match[2], 10) };
+        }
+        return { prefix: id, num: 0 };
+          };
+          const aParts = parseId(a.id);
+          const bParts = parseId(b.id);
+
+          if (aParts.prefix === bParts.prefix) {
+        return aParts.num - bParts.num;
+          }
+          return aParts.prefix.localeCompare(bParts.prefix);
+        });
+      setRequirements(filteredAndSorted);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
   }, []);
-
   useEffect(() => {
     fetchData();
-    }, []);
+  }, []);
 
   /**
    * Handler to delete a requirement for the searcher and the list.
@@ -81,12 +100,6 @@ const AllRequirementsList = ({ onUpdateRequirement, onDeleteRequirement }) => {
 
   return (
     <>
-      <RequirementSearch
-        onValueChange={handleSearching}
-        onUpdateRequirement={handleUpdateRequirement}
-        onDeleteRequirement={handleDeleteRequirement}
-        allReqs={requirements}
-      />
       {!isSearching && (
         <>
           <Text size="xlarge" weight="bold" marginBottom="large">

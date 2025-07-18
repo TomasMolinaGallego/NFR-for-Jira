@@ -1,204 +1,183 @@
-import React, { useState, useEffect } from 'react';
-import { invoke } from '@forge/bridge';
-import {
-    Box,
-    Text,
-    Textfield,
-    List,
-    Button,
-} from '@forge/react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { Box, Text, TextArea, Button } from '@forge/react';
 import Card from '../Card';
 
-/**
- * Component to search for requirements in all catalogs.
- * It allows searching by title, description, type, validation method, importance, correlation, dependencies or category.
- */
-const RequirementSearch = ({ onValueChange, onUpdateRequirement, onDeleteRequirement, allReqs }) => {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [results, setResults] = useState([]);
-    const [allRequirements, setAllRequirements] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [searchTerms, setSearchTerms] = useState('');
+// Component disabled due to issues with the search performance and the need for a more robust solution.
 
-    const selectSearchTerm = (term) => {
-        // If the term is already selected, deselect it
-        if (searchTerms === term) {
-            setSearchTerms('');
-        } else {
-            // Otherwise, set the selected term
-            setSearchTerms(term);
-        }
+const RequirementSearch = ({ 
+  onValueChange, 
+  onUpdateRequirement, 
+  onDeleteRequirement, 
+  allReqs 
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  const [results, setResults] = useState([]);
+  const [searchFilter, setSearchFilter] = useState('');
+  const searchTimerRef = useRef(null);
+  const latestSearchRef = useRef('');
+
+  // Función de búsqueda con cancelación de solicitudes anteriores
+  const searchRequirements = useCallback((term) => {
+    const currentTerm = term.trim().toLowerCase();
+    latestSearchRef.current = currentTerm;
+    console.log(`Searching for: ${currentTerm}`);
+    if (!currentTerm) {
+        console.log('Search term is empty, clearing results');
+      onValueChange(false);
+      setResults([]);
+      return;
     }
 
-    // Load all requirements from the catalog
-    // and set the loading state to false
-    const loadRequirements = async () => {
-        const requirements = allReqs;
-        setAllRequirements(requirements);
-        setLoading(false);
-    };
+    onValueChange(true);
+    
+    let filtered = [];
+    if (!searchFilter) {
+      filtered = allReqs.filter(req => {
+        const searchContent = `
+          ${req.heading?.toLowerCase()}
+          ${req.text?.toLowerCase()}
+          ${req.catalogTitle?.toLowerCase()}
+          ${req.catalogId.toLowerCase()}
+          ${req.dependencies?.join(',').toLowerCase()}
+          ${req.id.toLowerCase()}
+          ${req.issuesLinked?.map(issue => issue.issueKey.toLowerCase()).join(', ')}
+        `;
+        return searchContent.includes(currentTerm);
+      });
+    } else {
+      switch (searchFilter) {
+        case 'title':
+          filtered = allReqs.filter(req => 
+            req.header?.toLowerCase().includes(currentTerm)
+          );
+          break;
+        case 'description':
+          filtered = allReqs.filter(req => 
+            req.text?.toLowerCase().includes(currentTerm)
+          );
+          break;
+        case 'catalogTitle':
+          filtered = allReqs.filter(req => 
+            req.catalogTitle?.toLowerCase().includes(currentTerm)
+          );
+          break;
+        default: break;
+      }
+    }
+    
+    // Solo actualiza resultados si es la última solicitud
+    if (latestSearchRef.current === currentTerm) {
+      setResults(filtered);
+    }
+  }, [searchFilter, allReqs, onValueChange]);
 
-    // Load the requirements when the component mounts
-    // and when the allReqs prop changes
-    useEffect(() => {
-        const loadData = async () => {
-            await loadRequirements();
-        };
-        loadData();
-    }, [allReqs]);
+  useEffect(() => {
+    console.log('Search results updated:', results);
+  }, [results]);
 
-    // Update the results when the allRequirements state changes
-    const handleUpdateRequirement = (catalogId, reqId, updatedData) => {
-        onUpdateRequirement(catalogId, reqId, updatedData);
-        setResults((prev) =>
-            prev.map((req) => (req.id === reqId ? { ...req, ...updatedData } : req))
-        );
-    };
+  // Debounce mejorado con cancelación de búsquedas obsoletas
+  useEffect(() => {
+    const term = searchTerm.trim();
+    
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
 
-    // Delete the requirement from the results and call the onDeleteRequirement function
-    // to delete it from the catalog
-    const handleDeleteRequirement = (catalogId, reqId) => {
-        setResults((prev) => prev.filter((req) => req.id !== reqId));
-        onDeleteRequirement(catalogId, reqId);
-    };
+    if (term === '') {
+      onValueChange(false);
+      setResults([]);
+      return;
+    }
 
-    // Search for requirements based on the search term and selected search term
-    const searchRequirements = (term) => {
-        setSearchTerm(term);
-        if (!term) {
-            onValueChange(false);
-            setResults([]);
-            return;
-        }
+    searchTimerRef.current = setTimeout(() => {
+      searchRequirements(term);
+    }, 300);
 
-        onValueChange(true);
-        var filtered;
-        const lowerTerm = term.toLowerCase();
-        if (searchTerms.length == 0) {
-            // If no search term is selected, search in all fields
-            // This is a fallback to search in all fields if no specific term is selected
-            filtered = allRequirements.filter(req => {
-                const searchableText = `
-            ${req.title?.toLowerCase()}
-            ${req.description?.toLowerCase()}
-            ${req.type?.toLowerCase()}
-            ${req.category?.toLowerCase()} 
-            ${req.validation?.toLowerCase()}
-            ${req.catalogTitle?.toLowerCase()}
-            ${req.catalogId.toLowerCase()}
-            ${req.id.toLowerCase()}
-            ${req.issuesLinked?.map(issue => issue.issueKey.toLowerCase()).join(', ')}
-          `;
-                // The catalog id is only added to update the requirement
-                // and not to search for it
-                return searchableText.includes(lowerTerm);
-            });
+    return () => clearTimeout(searchTimerRef.current);
+  }, [searchTerm, searchRequirements, onValueChange]);
 
-        } else {
-            // Filter based on the selected search term
-            switch (searchTerms) {
-                case 'title':
-                    filtered = allRequirements.filter(req => { const searchableText = `${req.title?.toLowerCase()}`; return searchableText.includes(lowerTerm) });
-                    break;
-                case 'description':
-                    filtered = allRequirements.filter(req => { const searchableText = `${req.description?.toLowerCase()}`; return searchableText.includes(lowerTerm) });
-                    break;
-                case 'type':
-                    filtered = allRequirements.filter(req => { const searchableText = `${req.type?.toLowerCase()}`; return searchableText.includes(lowerTerm) });
-                    break;
-                case 'category':
-                    filtered = allRequirements.filter(req => { const searchableText = `${req.category?.toLowerCase()}`; return searchableText.includes(lowerTerm) });
-                    break;
-                case 'validation':
-                    filtered = allRequirements.filter(req => { const searchableText = `${req.validation?.toLowerCase()}`; return searchableText.includes(lowerTerm) });
-                    break;
-                case 'catalogTitle':
-                    filtered = allRequirements.filter(req => { const searchableText = `${req.catalogTitle?.toLowerCase()}`; return searchableText.includes(lowerTerm) });
-                    break;
-                default:
-                    break;
-            }
-        }
-        setResults(filtered);
-    };
+  // Handlers optimizados
+  const handleSearchChange = (e) => {
+    console.log('Search input changed:', e.target.value);
+    const value = e.target.value;
+    setSearchTerm(value);
+    
+    // Respuesta inmediata al borrado completo
+    if (!value.trim()) {
+        console.log('Search term cleared');
+      onValueChange(false);
+      setResults([]);
+    }
+  };
+  
+  const toggleFilter = (filter) => {
+    setSearchFilter(prev => prev === filter ? '' : filter);
+  };
 
-    return (
-        <Box padding="medium">
-            <Text size="xlarge" weight="bold" marginBottom="large">
-                Requirements Finder
-            </Text>
-
-            <Box marginBottom="xlarge">
-                <Textfield
-                    placeholder="Search requirements..."
-                    iconBefore='search'
-                    value={searchTerm}
-                    onChange={(e) => {
-                        setSearchTerm(e.target.value);
-                        searchRequirements(e.target.value);
-                    }}
-                />
-                <Text> Search by: </Text>
-                <Button
-                    spacing="none"
-                    appearance={searchTerms == 'title' ? 'primary' : 'default'}
-                    onClick={() => { selectSearchTerm('title'); }}>
-                    <Text>Title</Text>
-                </Button>
-                <Button
-                    spacing="none"
-                    appearance={searchTerms == 'description' ? 'primary' : 'default'}
-                    onClick={() => { selectSearchTerm('description'); }}>
-                    <Text>Description</Text>
-                </Button>
-                <Button
-                    spacing="none"
-                    appearance={searchTerms == 'category' ? 'primary' : 'default'}
-                    onClick={() => { selectSearchTerm('category'); }}>
-                    <Text>Category</Text>
-                </Button>
-                <Button
-                    spacing="none"
-                    appearance={searchTerms == 'type' ? 'primary' : 'default'}
-                    onClick={() => { selectSearchTerm('type'); }}>
-                    <Text>Type</Text>
-                </Button>
-                <Button
-                    spacing="none"
-                    appearance={searchTerms == 'validation' ? 'primary' : 'default'}
-                    onClick={() => { selectSearchTerm('validation'); }}>
-                    <Text>Validation</Text>
-                </Button>
-                <Button
-                    spacing="none"
-                    appearance={searchTerms == 'catalogTitle' ? 'primary' : 'default'}
-                    onClick={() => { selectSearchTerm('catalogTitle'); }}>
-                    <Text>Catalog title</Text>
-                </Button>
-                <Text color="subtlest" marginTop="xsmall">
-                    Search by title, description, category, type, validation or catalogue.
-                </Text>
-            </Box>
-
-            {loading ? (
-                <Text>Loading...</Text>
-            ) : (
-                <Box>
-                    {results.map((req) => (
-                        <Card
-                            req={req}
-                            onUpdateRequirement={handleUpdateRequirement}
-                            onDeleteRequirement={handleDeleteRequirement}
-                        />
-                    ))}
-
-                    {!loading && results.length === 0 && searchTerm && (
-                        <Text color="disabled">No results were found for "{searchTerm}"</Text>
-                    )}
-                </Box>
-            )}
-        </Box>
+  const handleUpdate = (catalogId, reqId, updatedData) => {
+    onUpdateRequirement(catalogId, reqId, updatedData);
+    setResults(prev => 
+      prev.map(req => req.id === reqId ? { ...req, ...updatedData } : req)
     );
+  };
+
+  const handleDelete = (catalogId, reqId) => {
+    setResults(prev => prev.filter(req => req.id !== reqId));
+    onDeleteRequirement(catalogId, reqId);
+  };
+
+  // Componente de botón de filtro reutilizable
+  const FilterButton = ({ name, label }) => (
+    <Button
+      spacing="none"
+      appearance={searchFilter === name ? 'primary' : 'default'}
+      onClick={() => toggleFilter(name)}
+    >
+      <Text>{label}</Text>
+    </Button>
+  );
+
+  return (
+    <Box padding="medium">
+      <Text size="xlarge" weight="bold" marginBottom="large">
+        Requirements Finder
+      </Text>
+
+      <Box marginBottom="xlarge">
+        <TextArea
+          placeholder="Search requirements..."
+          value={searchTerm}
+          onChange={handleSearchChange}
+        />
+        
+        <Text>Search by:</Text>
+        <Box marginTop="small" display="flex" gap="small">
+          <FilterButton name="title" label="Title" />
+          <FilterButton name="description" label="Description" />
+          <FilterButton name="catalogTitle" label="Catalog title" />
+        </Box>
+        
+        <Text color="subtlest" marginTop="xsmall">
+          Search by title, description, category, type, validation or catalogue.
+        </Text>
+      </Box>
+
+      <Box>
+        {results.map(req => (
+          <Card
+            key={req.id}
+            req={req}
+            onUpdateRequirement={handleUpdate}
+            onDeleteRequirement={handleDelete}
+          />
+        ))}
+
+        {searchTerm && results.length === 0 && (
+          <Text color="disabled">No results were found for "{searchTerm}"</Text>
+        )}
+      </Box>
+    </Box>
+  );
 };
 
 export default RequirementSearch;

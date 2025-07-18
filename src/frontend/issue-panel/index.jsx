@@ -116,16 +116,6 @@
           isSortable: false,
         },
         {
-          key: "Type",
-          content: "Type",
-          isSortable: false,
-        },
-        {
-          key: "Category",
-          content: "Category",
-          isSortable: false,
-        },
-        {
           key: "Catalog",
           content: "Catalog",
           shouldTruncate: true,
@@ -150,11 +140,9 @@
     const linkedTableRows = linkedRequirements.map(req => ({
       cells: [
         { content: <Tag text={req.reqId} appearance="primary" /> },
-        { content: req.title },
-        { content: req.description },
+        { content: req.header },
+        { content: req.text },
         { content: getStatusLozenge(req.status)} ,
-        { content: req.type },
-        { content: req.category },
         { content: req.catalogTitle },
         { content: <ButtonGroup label="Default button group">
                       <Button onClick={() => setStatusRequirement(req.reqId, req.catalogId, 'Validated')}>Validate</Button> 

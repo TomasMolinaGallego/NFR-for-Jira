@@ -1,5 +1,5 @@
-import React, { useState, useCallback, memo } from 'react';
-import { Box, Text, Stack, Inline, Badge, Button, ListItem, List } from '@forge/react';
+import React, { useState, useCallback, memo, useEffect } from 'react';
+import { Box, Text, Stack, Inline, Badge, Button, ListItem, List, Lozenge } from '@forge/react';
 import EditRequirementModal from '../EditRequirementModal';
 
 const getBadgeAppearance = (value) => {
@@ -49,9 +49,10 @@ const Card = memo(({ req, onUpdateRequirement, onDeleteRequirement }) => {
         <>
             {req.type && <Badge>{req.type}</Badge>}
             {req.category && <Badge>{req.category}</Badge>}
-            {req.important && <Badge max='100'>{req.important}</Badge>}
+            {req.important && <Lozenge max='100'>Importance: {req.important}</Lozenge>}
         </>
     ), [req.type, req.category, req.important]);
+
 
     return (
         <Box
@@ -68,7 +69,7 @@ const Card = memo(({ req, onUpdateRequirement, onDeleteRequirement }) => {
                     onClick={toggleExpanded}
                     iconBefore={isExpanded ? 'chevron-down' : 'chevron-right'}
                 >
-                    <Text size="large" weight="bold">{`${req.id} ${req.title}`}</Text>
+                    <Text size="large" weight="bold">{`${req.id} ${req.heading}`}</Text>
                 </Button>
                 {req.important && (
                     <Badge
@@ -87,12 +88,11 @@ const Card = memo(({ req, onUpdateRequirement, onDeleteRequirement }) => {
                             <Stack>
                                 <Inline spread="space-between" alignBlock="center">
                                     <Box>
-                                        <Text>{req.description}</Text>
+                                        <Text>Section: {req.section}</Text>
+                                        <Text>{req.text}</Text>
                                         {renderBadges()}
-                                        {req.validation && <Text>Validation: {req.validation}</Text>}
-                                        {req.correlation && <Text>Correlation: {req.dependencies.join(', ')}</Text>}
-                                        {req.dependencies && <Text>Dependencies: {req.dependencies.join(', ')}</Text>}
-                                        {req.issuesLinked && <Text>Issues linked: {req.issuesLinked?.map(issue => issue.issueKey).join(', ')}</Text>}
+                                        {req.dependencies?.length !== 0 && <Text>Dependencies: {req.dependencies.join(', ')}</Text>}
+                                        {req.childrenIds?.length !== 0 && <Text>Children requirements : {req.childrenIds?.join(', ')}</Text>}
                                     </Box>
                                     <Inline>
                                         <Button

@@ -122,15 +122,16 @@ resolver.define('addRequirement', async ({ payload }) => {
       ...requirements,
       {
         id: reqId,
-        title: payload.formState.reqTitle,
-        description: payload.formState.reqDescription,
-        type: payload.formState.reqType,
-        category: payload.formState.reqCategory,
+        header: payload.formState.reqTitle,
+        text: payload.formState.reqDescription,
         important: payload.formState.reqImportant,
-        validation: payload.formState.reqValidation,
-        correlation: payload.formState.reqCorrelation,
-        dependencies: payload.formState.reqDependencies,
-        issuesLinked: []
+        issuesLinked: [],
+        isContainer: false,
+        childrenIds: [],
+        dependencies: [],
+        riesgo: 0,
+        level: 1,
+        siblingCount: 0,
       }
     ];
   });
@@ -319,5 +320,59 @@ resolver.define('importRequirementsFromCSV', async ({ payload }) => {
     };
   }
 });
+
+resolver.define('importRequirementsFromCustomCSV', async ({ payload }) => {
+  const { requirements, catalogName, catalogDescription, prefix, userId } = payload;
+  console.log('Importing requirements:', userId.accountId);
+  const results = { total: requirements.length, success: 0, errors: [] as { message: string }[] };
+  try {
+    const flatReqs = flattenRequirements(requirements, null, catalogName);
+    const newCatalog = {
+      ...createNewCatalogData(userId.accountId, catalogName, catalogDescription, prefix),
+      requirements: flatReqs
+    };
+    await saveCatalog(newCatalog);
+    results.success = flatReqs.length;
+    return results;
+  } catch (error: any) {
+    results.errors.push({ message: `Error al importar requisitos: ${error.message}` });
+    return results;
+  }
+});
+
+const flattenRequirements = (
+  requirements: any[],
+  parentId: string | null = null,
+  catalogName?: string
+) => {
+  return requirements.reduce((acc, req) => {
+    const childrenIds = req.children?.map((c: any) => c.id) || [];
+    const flatReq = {
+      id: req.id,
+      level: req.level,
+      section: req.section,
+      heading: req.heading,
+      text: req.text,
+      parentId,
+      childrenIds,
+      important: req.important,
+      nAudit: 0,
+      nDep: req.nDep || 0,
+      effort: req.effort,
+      children: [],
+      riesgo: 0,
+      dependencies: req.dependencies || [],
+      isContainer: !req.text || req.text.trim() === "",
+      catalogTitle: catalogName || '',
+      siblingCount: 0,
+      issuesLinked: req.issuesLinked || [],
+    };
+    acc.push(flatReq);
+    if (req.children?.length) {
+      acc.push(...flattenRequirements(req.children, req.id, catalogName));
+    }
+    return acc;
+  }, []);
+};
 
 export const handler = resolver.getDefinitions();

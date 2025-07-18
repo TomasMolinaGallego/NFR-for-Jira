@@ -17,13 +17,15 @@ const RequirementSearch = ({ onSelect }) => {
     const loadCatalogs = async () => {
       const result = await invoke('getAllCatalogs');
       setCatalogs(result);
-      requirements = catalogs.flatMap(catalog => 
+      const allRequirements = result.flatMap(catalog =>
         (catalog.requirements || []).map(req => ({
           ...req,
           catalogId: catalog.id,
           catalogTitle: catalog.title
         }))
       );
+      allRequirements.filter(req => !req.isContainer);
+      setRequirements(allRequirements);
     };
     
     loadCatalogs();
@@ -58,7 +60,7 @@ const RequirementSearch = ({ onSelect }) => {
       tableRows = requirements.map(req => ({
         cells: [
           { content: <Tag text={req.id} appearance="primary" /> },
-          { content: <Text weight="medium">{req.title}</Text> },
+          { content: <Text weight="medium">{req.header}</Text> },
           { content: req.catalogTitle },
           { content: <Button onClick={() => onSelect(req)}>Seleccionar</Button> }
         ]
@@ -100,7 +102,7 @@ const RequirementSearch = ({ onSelect }) => {
   var tableRows = requirements.map(req => ({
     cells: [
       { content: <Tag text={req.id} appearance="primary" /> },
-      { content: <Text weight="medium">{req.title}</Text> },
+      { content: <Text weight="medium">{req.heading}</Text> },
       { content: req.catalogTitle },
       { content: <Button onClick={() => onSelect(req)}>Select</Button> }
     ]

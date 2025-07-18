@@ -48,7 +48,7 @@ forge tunnel
 
 ### Usage
 
-- Navigate to `Apps` -> `Your apps` -> `NFR for Jira` from the top navigation bar in Jira
+- Navigate to `Apps` -> `Your apps` -> `NFR Tracer` from the top navigation bar in Jira
 - Select one of the three pages available: **View catalogues**, **View requirements**, **Create catalogues**
 - If first usage -> Create your own catalog with a title, description and a prefix which will be used to name the requirements
 - You can create the requirements by hand, writing all the fields or by CSV, you have to use this template:

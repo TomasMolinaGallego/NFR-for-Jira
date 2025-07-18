@@ -50,7 +50,9 @@ const CatalogDetailPage = ({ catalogId, history }) => {
     const { progress, reqsValidated, reqsWithoutUS, reqsPendingValidation, reqsUnfilfilled, reqsValidatedWithRisk } = useMemo(() => {
         if (!catalog?.requirements) return {};
         // From the catalog selected, we calculate the requirements stats based on their status
+        catalog.requirements = catalog.requirements.filter(req => !req.isContainer);
         const requirementStats = catalog.requirements.reduce((acc, req) => {
+            if(!req.issuesLinked) return acc; // Skip if no issues linked
             const hasIssues = req.issuesLinked.length > 0;
             const hasPending = req.issuesLinked.some(issue => issue.status === 'pending_validation');
             const hasUnfulfilled = req.issuesLinked.some(issue => issue.status === 'Unfulfilled');
@@ -191,12 +193,9 @@ const CatalogDetailPage = ({ catalogId, history }) => {
         const reqRows = filteredRequirements?.map(req => ({
             cells: [
                 { content: req.id },
-                { content: <Text weight="medium">{req.title}</Text> },
-                { content: req.description },
-                { content: req.type || 'N/A' },
-                { content: req.category || 'N/A' },
+                { content: <Text weight="medium">{req.header}</Text> },
+                { content: req.text },
                 { content: req.important },
-                { content: req.validation || 'N/A' },
                 { content: formatIssuesList(req.issuesLinked) },
                 { content: req.dependencies?.join(', ') || 'N/A' },
                 { content: req.correlation?.join(', ') || 'N/A' },
@@ -394,6 +393,7 @@ const CatalogHeader = React.memo(({ catalog }) => (
             <Text></Text>
         </Box>
         <Inline spread="space-between" marginTop="medium">
+            {console.log('Catalog prefix:', catalog)}
             <Text weight="bold">Prefix: <Text><Tag text={catalog.prefix} appearance="primary" /></Text></Text>
             <Text weight="bold">Owner:</Text><User accountId={catalog.userId} />
             <Text><Text weight="bold">Creation date:</Text> {catalog.dateCreation}</Text>
@@ -407,11 +407,11 @@ const ComplianceProgress = React.memo(({ progress, donutData, ...stats }) => (
         <Text weight="bold" marginBottom="medium">Compliance Status</Text>
         <Inline spread="space-between">
             <Box>
-                <Text>Requirements validated: <Badge>{stats.reqsValidated.length}</Badge></Text>
-                <Text>Requirements validated with risk: <Badge>{stats.reqsValidatedWithRisk.length}</Badge></Text>
-                <Text>Requierements without US: <Badge>{stats.reqsWithoutUS.length}</Badge></Text>
-                <Text>Requirements pending validation: <Badge>{stats.reqsPendingValidation.length}</Badge></Text>
-                <Text>Requirements unfulfilled: <Badge>{stats.reqsUnfilfilled.length}</Badge></Text>
+                <Text>Requirements validated: <Lozenge>{stats.reqsValidated.length}</Lozenge></Text>
+                <Text>Requirements validated with risk: <Lozenge>{stats.reqsValidatedWithRisk.length}</Lozenge></Text>
+                <Text>Requierements without US: <Lozenge>{stats.reqsWithoutUS.length}</Lozenge></Text>
+                <Text>Requirements pending validation: <Lozenge>{stats.reqsPendingValidation.length}</Lozenge></Text>
+                <Text>Requirements unfulfilled: <Lozenge>{stats.reqsUnfilfilled.length}</Lozenge></Text>
             </Box>
         </Inline>
 
@@ -438,13 +438,9 @@ const HEADERS = {
             { key: "id", content: "ID", isSortable: true },
             { key: "title", content: "Title", isSortable: false },
             { key: "summary", content: "Description", shouldTruncate: true },
-            { key: "type", content: "Type", shouldTruncate: true },
-            { key: "category", content: "Category", shouldTruncate: true },
             { key: "important", content: "Importance", isSortable: true },
-            { key: "validation", content: "Validation", shouldTruncate: true },
             { key: "linkedIssues", content: "Issues Vinculados" },
             { key: "dependencies", content: "Dependencies", isSortable: true },
-            { key: "correlation", content: "Correlation", isSortable: true },
             { key: "status", content: "Status" },
             { key: "motives", content: "Motives" }
         ]
@@ -460,7 +456,7 @@ const MotivesUnfullfilmentModal = ({ requirement, onClose }) => {
         <ModalTransition>
             <Modal onClose={onClose}>
                 <ModalHeader>
-                    <Text size="xlarge" weight="bold" >Motives - {requirement?.id} {requirement?.title}</Text>
+                    <Text size="xlarge" weight="bold" >Motives - {requirement?.id} {requirement?.header}</Text>
                 </ModalHeader>
 
                 <ModalBody>

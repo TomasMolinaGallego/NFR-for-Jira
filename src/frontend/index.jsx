@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import ForgeReconciler, { Box, Text } from "@forge/react";
 import { invoke, view } from "@forge/bridge";
-import CatalogForm from './components/CatalogForm';
 import CatalogList from './components/CatalogList';
 import Notification from './components/Notification';
 import RequirementModal from './components/RequirementModal';
 import AllRequirementsList from './components/AllRequirementsList';
 import CatalogDetailPage from "./components/CatalogDetailPage/Index";
+import CSVRequirementsLoader from './components/CsvImporter/csvImporter';
 
 // Initial form state for the catalog and requirement forms
 const INITIAL_FORM_STATE = {
@@ -214,14 +214,7 @@ const App = () => {
       case 'create-catalogues':
         return (
           <>
-            <Text size="xlarge" weight="bold" spacing="medium">
-              Gestión de Requisitos No Funcionales
-            </Text>
-            <CatalogForm
-              formState={formState}
-              onFormChange={setFormState}
-              onSubmit={createCatalog}
-            />
+            <CSVRequirementsLoader onSuccess={loadCatalogs} ></CSVRequirementsLoader>
             <Notification {...notification} />
             <CatalogList
               catalogs={catalogs}

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo } from 'react';
+import React, { useState, useCallback, memo, useEffect } from 'react';
 import {
   ListItem,
   Stack,
@@ -11,6 +11,7 @@ import {
 } from '@forge/react';
 import EditRequirementModal from '../EditRequirementModal';
 import CSVImporter from '../CsvImporter';
+import CSVRequirementsLoader from '../CsvImporter/csvImporter';
 
 const getImportanceAppearance = (value) => {
   const num = parseInt(value) || 0;
@@ -32,7 +33,10 @@ const CatalogListItem = memo(({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingRequirement, setEditingRequirement] = useState(null);
-  const [isCsvImporterOpen, setIsCsvImporterOpen] = useState(false);
+
+  useEffect(() => {
+    catalog.requirements = catalog.requirements.filter(req => !req.isContainer);
+  });
 
   const toggleExpanded = useCallback(() => {
     setIsExpanded(prev => !prev);
@@ -85,12 +89,12 @@ const CatalogListItem = memo(({
 
   const renderRequirementDetails = useCallback((req) => (
     <Stack space="small">
-      <Text weight="medium">{req.id}</Text>
-      <Text color="subtlest">{req.description}</Text>
+      <Text weight="bold">{req.heading}</Text>
+      <Text>Section: {req.section}</Text>
+      <Text>{req.text}</Text>
       {renderRequirementBadges(req)}
-      {req.validation && <Text size="small">Validation: {req.validation}</Text>}
-      {req.correlation && <Text size="small">Correlation: {req.correlation.join(', ')}</Text>}
-      {req.dependencies && <Text size="small">Dependencies: {req.dependencies.join(', ')}</Text>}
+      {req.dependencies?.length !== 0 ? <Text>Dependencies: {req.dependencies.join(', ')}</Text> : ""}
+      {req.childrenIds?.length !== 0 ? <Text>Children requirements : {req.childrenIds?.join(', ')}</Text> : ""}
     </Stack>
   ), [renderRequirementBadges]);
 
@@ -158,13 +162,6 @@ const CatalogListItem = memo(({
               New Requirement
             </Button>
             <Button
-              onClick={() => setIsCsvImporterOpen(isCsvImporterOpen => !isCsvImporterOpen)}
-              iconBefore="upload"
-              appearance="default"
-            >
-              Import CSV
-            </Button>
-            <Button
               onClick={() => onDelete(catalog.id)}
               iconBefore="trash"
               appearance="danger"
@@ -184,14 +181,6 @@ const CatalogListItem = memo(({
             requirement={editingRequirement}
             onClose={() => setEditingRequirement(null)}
             onSave={handleSaveChanges}
-          />
-        )}
-
-        {isCsvImporterOpen && (
-          <CSVImporter
-            catalogId={catalog.id}
-            onComplete={handleCsvImportComplete}
-            onClose={() => setIsCsvImporterOpen(false)}
           />
         )}
       </Stack>
