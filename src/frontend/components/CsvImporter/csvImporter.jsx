@@ -15,7 +15,6 @@ import { invoke, view } from '@forge/bridge';
 
 const REQUIRED_HEADERS = ['id', 'level', 'section', 'heading', 'text', 'important', 'dependencies'];
 
-// CSV parser optimizado
 const parseCSV = (text) => {
   if (!text.trim()) return [];
 
@@ -60,7 +59,6 @@ const parseCSV = (text) => {
   }).filter(Boolean);
 };
 
-// Construcción de jerarquía optimizada
 const buildHierarchy = (items) => {
   if (!items.length) return [];
 
@@ -77,7 +75,6 @@ const buildHierarchy = (items) => {
     }
   }
 
-  // Ordenar recursivamente
   const sortTree = nodes => {
     nodes.sort((a, b) => a.section.localeCompare(b.section));
     nodes.forEach(node => sortTree(node.children));
@@ -87,7 +84,6 @@ const buildHierarchy = (items) => {
   return roots;
 };
 
-// Contador de requisitos optimizado
 const countRequirements = (nodes) => {
   if (!nodes.length) return 0;
   
@@ -103,7 +99,6 @@ const countRequirements = (nodes) => {
   return count;
 };
 
-// Componente memoizado para nodos de requisitos
 const RequirementNode = React.memo(({ requirement, depth = 0 }) => (
   <Box padding="space.0" marginBottom="space.100">
     <Box
@@ -149,14 +144,12 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
   const [catalogPrefix, setCatalogPrefix] = useState('');
   const [csvText, setCsvText] = useState('');
   
-  // Memoized processing results
   const [processingResult, setProcessingResult] = useState({
     flatItems: [],
     hierarchy: [],
     showPreview: false
   });
 
-  // Procesar CSV sin almacenar el texto completo
   const handleProcessCSV = useCallback(() => {
     setError(null);
     setSaveStatus(null);
@@ -232,7 +225,6 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
     setCatalogPrefix('');
   }, []);
 
-  // Memoized requirement count
   const totalRequirements = useMemo(() => {
     return countRequirements(processingResult.hierarchy);
   }, [processingResult.hierarchy]);

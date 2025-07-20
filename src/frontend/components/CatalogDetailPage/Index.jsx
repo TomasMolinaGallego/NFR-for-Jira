@@ -46,13 +46,12 @@ const CatalogDetailPage = ({ catalogId, history }) => {
     const [selectedRequirement, setSelectedRequirement] = useState(null);
 
 
-    // Memoized data calculations
     const { progress, reqsValidated, reqsWithoutUS, reqsPendingValidation, reqsUnfilfilled, reqsValidatedWithRisk } = useMemo(() => {
         if (!catalog?.requirements) return {};
         // From the catalog selected, we calculate the requirements stats based on their status
         catalog.requirements = catalog.requirements.filter(req => !req.isContainer);
         const requirementStats = catalog.requirements.reduce((acc, req) => {
-            if(!req.issuesLinked) return acc; // Skip if no issues linked
+            if(!req.issuesLinked) return acc;
             const hasIssues = req.issuesLinked.length > 0;
             const hasPending = req.issuesLinked.some(issue => issue.status === 'pending_validation');
             const hasUnfulfilled = req.issuesLinked.some(issue => issue.status === 'Unfulfilled');
@@ -239,10 +238,6 @@ const CatalogDetailPage = ({ catalogId, history }) => {
         ['validated_with_risk', 'Req. validated with risk', reqsValidatedWithRisk?.length || 0]
     ], [reqsValidated, reqsWithoutUS, reqsPendingValidation, reqsUnfilfilled, reqsValidatedWithRisk]);
 
-    //-------------------------------------
-    // Code REACT
-    //-------------------------------------
-
     if (error) {
         return (
             <Box padding="medium">
@@ -381,7 +376,6 @@ const CatalogDetailPage = ({ catalogId, history }) => {
     );
 };
 
-// Sub-componentes
 const CatalogHeader = React.memo(({ catalog }) => (
     <Box marginBottom="xlarge">
         <Text size="large" weight="bold">{catalog.title}</Text>
@@ -393,7 +387,6 @@ const CatalogHeader = React.memo(({ catalog }) => (
             <Text></Text>
         </Box>
         <Inline spread="space-between" marginTop="medium">
-            {console.log('Catalog prefix:', catalog)}
             <Text weight="bold">Prefix: <Text><Tag text={catalog.prefix} appearance="primary" /></Text></Text>
             <Text weight="bold">Owner:</Text><User accountId={catalog.userId} />
             <Text><Text weight="bold">Creation date:</Text> {catalog.dateCreation}</Text>
@@ -467,7 +460,7 @@ const MotivesUnfullfilmentModal = ({ requirement, onClose }) => {
                     <Stack alignInline="start" space="space.200">
                         {motives.length > 0 ? (
                             motives
-                                .filter(issue => issue.explanation) // Filter out issues with empty explanation
+                                .filter(issue => issue.explanation)
                                 .map((issue, index) => (
                                     <Box key={index} padding="small" border="standard" marginBottom="small">
                                         <Inline space="space.200">

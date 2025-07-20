@@ -118,8 +118,6 @@ resolver.define('deleteCatalog', async ({ payload }) => {
 resolver.define('addRequirement', async ({ payload }) => {
   await updateCatalogRequirements(payload.catalogId, requirements => {
     const reqId = `${payload.prefix}-${requirements.length}`;
-    console.log('Adding requirement with ID:', payload.formState.reqDesc);
-    console.log('Calculated section:', payload);
     return [
       ...requirements,
       {
@@ -326,7 +324,6 @@ resolver.define('importRequirementsFromCSV', async ({ payload }) => {
 
 resolver.define('importRequirementsFromCustomCSV', async ({ payload }) => {
   const { requirements, catalogName, catalogDescription, prefix, userId } = payload;
-  console.log('Importing requirements:', userId.accountId);
   const results = { total: requirements.length, success: 0, errors: [] as { message: string }[] };
   try {
     const flatReqs = flattenRequirements(requirements, null, catalogName);
@@ -334,10 +331,8 @@ resolver.define('importRequirementsFromCustomCSV', async ({ payload }) => {
       ...createNewCatalogData(userId.accountId, catalogName, catalogDescription, prefix),
       requirements: flatReqs
     };
-    console.log('New catalog data:');
     await saveCatalog(newCatalog);
     results.success = flatReqs.length;
-    console.log('Requirements imported successfully:', results.success);
     return results;
   } catch (error: any) {
     results.errors.push({ message: `Error al importar requisitos: ${error.message}` });
@@ -382,17 +377,6 @@ const flattenRequirements = (
 
 resolver.define('deleteAllData', async () => {
   const allKeys = await storage.query().where('key', { condition: 'STARTS_WITH', value: '' }).getMany();
-  // Calcula el tamaño total en KB de todos los valores almacenados
-  let totalBytes = 0;
-  for (const item of allKeys.results) {
-    if (item.value) {
-      // Convierte el valor a string y calcula los bytes
-      const str = typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
-      totalBytes += Buffer.byteLength(str, 'utf8');
-    }
-  }
-  const totalKB = (totalBytes / 1024).toFixed(2);
-  console.log(`Deleting all data, total keys: ${allKeys.results.length}, total size: ${totalKB} KB`);
   for (const item of allKeys.results) {
     await storage.delete(item.key);
   }

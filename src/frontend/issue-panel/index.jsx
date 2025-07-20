@@ -41,7 +41,6 @@
       await loadLinkedRequirements();
     };
 
-    // Actualiza la definición de STATUS_APPEARANCE
     const STATUS_APPEARANCE = {
       Validated: 'success',
       pending_validation: 'inprogress',

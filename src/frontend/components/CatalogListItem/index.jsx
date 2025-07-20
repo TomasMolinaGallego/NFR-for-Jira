@@ -11,7 +11,6 @@ import {
 } from '@forge/react';
 import EditRequirementModal from '../EditRequirementModal';
 
-// Mover fuera del componente para evitar recreación
 const getImportanceAppearance = (value) => {
   const num = parseInt(value) || 0;
   if (num < 33) return 'added';
@@ -19,9 +18,6 @@ const getImportanceAppearance = (value) => {
   return 'important';
 };
 
-/**
- * Componente memoizado para mostrar un requisito individual
- */
 const RequirementItem = memo(({ req, onEdit }) => {
   const badges = useMemo(() => (
     <Inline space="small" marginTop="small">
@@ -64,9 +60,6 @@ const RequirementItem = memo(({ req, onEdit }) => {
   );
 });
 
-/**
- * Componente principal optimizado para memoria
- */
 const CatalogListItem = memo(({
   catalog: originalCatalog,
   onSelect,
@@ -77,7 +70,6 @@ const CatalogListItem = memo(({
   const [isExpanded, setIsExpanded] = useState(false);
   const [editingRequirement, setEditingRequirement] = useState(null);
   
-  // Filtrar requisitos una sola vez usando useMemo
   const catalog = useMemo(() => ({
     ...originalCatalog,
     requirements: (originalCatalog.requirements || [])
@@ -108,7 +100,6 @@ const CatalogListItem = memo(({
     setIsExpanded(false);
   }, [catalog, onSelect]);
 
-  // Memoizar la lista de requisitos
   const requirementsList = useMemo(() => {
     if (!catalog.requirements?.length) {
       return <Text color="disabled">There are no requirements in this catalogue</Text>;

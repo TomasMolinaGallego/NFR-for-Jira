@@ -126,35 +126,29 @@ const RequirementSearch = ({
       }
     }
 
-    // Convert to requirement objects
     const resultsArray = Array.from(resultIds)
       .map(id => reqMap.get(id))
       .filter(Boolean)
-      .slice(0, 200); // Limit to 200 results
+      .slice(0, 200);
 
     if (onResultsChange) onResultsChange(resultsArray);
-  }, [invertedIndex, fieldIndices, reqMap, searchFilter, onResultsChange, onValueChange]); // Añadido onValueChange
+  }, [invertedIndex, fieldIndices, reqMap, searchFilter, onResultsChange, onValueChange]);
 
   useEffect(() => {
-    console.log('Search term changed:', searchTerm);
-    
     if (searchTimerRef.current) {
       cancelAnimationFrame(searchTimerRef.current);
     }
 
     if (!searchTerm.trim()) {
-      console.log('Empty search term');
       if (onResultsChange) onResultsChange([]);
       if (onValueChange) onValueChange(false);
       return;
     }
 
-    console.log('Starting search for:', searchTerm);
     if (onValueChange) onValueChange(true);
     
     const currentSearchTerm = searchTerm;
 
-    console.log('Executing search for:', currentSearchTerm);
     searchRequirements(currentSearchTerm);
 
     return () => {
@@ -177,7 +171,6 @@ const RequirementSearch = ({
     }
   }, [searchFilter, searchTerm, searchRequirements]);
 
-  // Handlers
   const handleSearchChange = useCallback((e) => {
     const value = e.target.value;
     setSearchTerm(value);
@@ -189,7 +182,6 @@ const RequirementSearch = ({
     }
   }, [onValueChange, onResultsChange]);
 
-  // Filter button component
   const FilterButton = ({ name, label }) => (
     <Button
       spacing="none"

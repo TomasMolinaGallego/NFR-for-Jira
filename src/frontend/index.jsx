@@ -8,7 +8,6 @@ import AllRequirementsList from './components/AllRequirementsList';
 import CatalogDetailPage from "./components/CatalogDetailPage/Index";
 import CSVRequirementsLoader from './components/CsvImporter/csvImporter';
 
-// Initial form state for the catalog and requirement forms
 const INITIAL_FORM_STATE = {
   catalogTitle: '',
   catalogDesc: '',
@@ -48,11 +47,9 @@ const App = () => {
     }
   }, []);
 
-  // Initialize the app and load catalogs
   useEffect(() => {
     const initializeApp = async () => {
       try {
-        // Create the global "history" from the dependency "view" of @forge/bridge
         const [history, context] = await Promise.all([
           view.createHistory(),
           view.getContext()
@@ -60,7 +57,6 @@ const App = () => {
 
         if (!isMountedRef.current) return;
 
-        // Handler for page changes that will be in the listener
         const handleHistoryChange = (location) => {
           const newPath = location.pathname.replace(/^\//, '');
           setSelectedPage(newPath);
@@ -84,7 +80,6 @@ const App = () => {
     };
   }, [loadCatalogs]);
 
-  // Handle catalog actions (create, delete, etc.)
   const handleCatalogAction = async (action, params, successMessage) => {
     try {
       await invoke(action, params);
@@ -95,7 +90,6 @@ const App = () => {
     }
   };
 
-  // Create a new catalog
   const createCatalog = async () => {
     const context = await view.getContext();
     await handleCatalogAction(
@@ -111,14 +105,12 @@ const App = () => {
     setFormState(prev => ({ ...prev, ...INITIAL_FORM_STATE }));
   };
 
-  // Delete a catalog
   const deleteCatalog = async (catalogId) => {
     if (confirm('Delete this catalogue and its requirements?')) {
       await handleCatalogAction('deleteCatalog', { catalogId }, 'Catalogue deleted');
     }
   };
 
-  // Delete a requirement
   const deleteRequirement = async (catalogId, requirementId) => {
     if (confirm('Remove this requirement?')) {
       await handleCatalogAction('deleteRequirement', { catalogId, requirementId }, 'Requirement removed');
@@ -127,7 +119,6 @@ const App = () => {
     return false
   }
 
-  // Update a requirement
   const handleRequirementAction = async (action, params, successMessage) => {
     try {
       const context = await view.getContext();
@@ -152,7 +143,6 @@ const App = () => {
 
   // Add a new requirement to the selected catalog
   const addRequirement = async () => {
-    console.log('Adding requirement with formState:', formState);
     let reqDependencies = formState.reqDependencies;
     if (Array.isArray(reqDependencies)) {
       reqDependencies = reqDependencies.map(dep =>
@@ -164,7 +154,6 @@ const App = () => {
     if (selectedCatalog && Array.isArray(selectedCatalog.requirements) && selectedCatalog.requirements.length > 0) {
       const lastReq = selectedCatalog.requirements[selectedCatalog.requirements.length - 1];
       const lastSection = parseFloat(lastReq.section);
-      console.log('Last section number:', lastSection);
       if (!isNaN(lastSection)) {
         nextSectionNumber = Math.floor(lastSection) + 1.1;
       }

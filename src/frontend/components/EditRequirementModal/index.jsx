@@ -12,18 +12,15 @@ const EditRequirementModal = ({ requirement, catalog, onClose, onSave }) => {
   const [allRequirements, setAllRequirements] = useState([]);
   const searchTimerRef = useRef(null);
 
-  // Initialize data and requirements
   useEffect(() => {
     if (requirement) {
       setEditedData({
         ...requirement,
-        // Ensure dependencies array exists
         dependencies: requirement.dependencies || []
       });
     }
 
     if (catalog) {
-      // Filter out containers and current requirement
       const requirements = (catalog.requirements || [])
         .filter(req => 
           !req.isContainer && 
@@ -33,7 +30,6 @@ const EditRequirementModal = ({ requirement, catalog, onClose, onSave }) => {
     }
   }, [requirement, catalog]);
 
-  // Debounced dependency search
   useEffect(() => {
     if (searchTimerRef.current) {
       clearTimeout(searchTimerRef.current);
@@ -57,7 +53,6 @@ const EditRequirementModal = ({ requirement, catalog, onClose, onSave }) => {
     return () => clearTimeout(searchTimerRef.current);
   }, [dependencySearch, allRequirements]);
 
-  // Add dependency
   const handleAddDependency = useCallback((dep) => {
     if (!editedData.dependencies.some(d => d.id === dep.id)) {
       setEditedData(prev => ({
@@ -69,7 +64,6 @@ const EditRequirementModal = ({ requirement, catalog, onClose, onSave }) => {
     setDependencyOptions([]);
   }, [editedData.dependencies]);
 
-  // Remove dependency
   const handleRemoveDependency = useCallback((id) => {
     setEditedData(prev => ({
       ...prev,
