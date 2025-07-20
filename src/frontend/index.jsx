@@ -152,12 +152,30 @@ const App = () => {
 
   // Add a new requirement to the selected catalog
   const addRequirement = async () => {
+    console.log('Adding requirement with formState:', formState);
+    let reqDependencies = formState.reqDependencies;
+    if (Array.isArray(reqDependencies)) {
+      reqDependencies = reqDependencies.map(dep =>
+      typeof dep === 'object' && dep !== null && dep.id ? dep.id : dep
+      );
+    }
+    const updatedFormState = { ...formState, reqDependencies };
+    let nextSectionNumber = 1;
+    if (selectedCatalog && Array.isArray(selectedCatalog.requirements) && selectedCatalog.requirements.length > 0) {
+      const lastReq = selectedCatalog.requirements[selectedCatalog.requirements.length - 1];
+      const lastSection = parseFloat(lastReq.section);
+      console.log('Last section number:', lastSection);
+      if (!isNaN(lastSection)) {
+        nextSectionNumber = Math.floor(lastSection) + 1.1;
+      }
+    }
+    updatedFormState.section = nextSectionNumber;
     await handleRequirementAction(
       'addRequirement',
       {
         catalogId: selectedCatalog.id,
         prefix: selectedCatalog.prefix,
-        formState
+        formState: updatedFormState
       },
       'Requirement added'
     );

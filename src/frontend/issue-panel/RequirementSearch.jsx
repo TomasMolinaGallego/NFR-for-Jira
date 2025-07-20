@@ -1,105 +1,144 @@
-import React, { useState, useEffect } from 'react';
-import { Box, Text, DynamicTable, Textfield, Inline, Tag, Button } from '@forge/react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { Box, Text, DynamicTable, Textfield, Tag, Button } from '@forge/react';
 import { invoke } from '@forge/bridge';
 
-/**
- * Component to search for requirements in all catalogs inside a Jira issue
- * It allows searching by title, description, type, validation method, importance, correlation, dependencies or category.
- */
 const RequirementSearch = ({ onSelect }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [requirements, setRequirements] = useState([]);
-  const [catalogs, setCatalogs] = useState([]);
+  const [results, setResults] = useState([]);
+  const [allRequirements, setAllRequirements] = useState([]);
   const [loading, setLoading] = useState(false);
+  const searchTimerRef = useRef(null);
+  
+  const MIN_SEARCH_LENGTH = 2;
+  const MAX_TOKEN_LENGTH = 20;
 
-  // Load all catalogs and their requirements when the component mounts
+  // Precompute optimized data structures
+  const { invertedIndex, reqMap } = useMemo(() => {
+    const invertedIndex = new Map();
+    const reqMap = new Map();
+
+    for (const req of allRequirements) {
+      reqMap.set(req.id, req); 
+      
+      const searchContent = `
+        ${req.heading?.toLowerCase() || ''}
+        ${req.text?.toLowerCase() || ''}
+        ${req.catalogTitle?.toLowerCase() || ''}
+        ${req.catalogId?.toLowerCase() || ''}
+        ${req.dependencies?.join(',').toLowerCase() || ''}
+        ${req.id?.toLowerCase() || ''}
+        ${req.issuesLinked?.map(issue => issue.issueKey.toLowerCase()).join(',') || ''}
+      `.replace(/\s+/g, ' '); // Normalize spaces
+      
+      // Sliding window tokenization
+      for (let start = 0; start < searchContent.length; start++) {
+        for (let length = 1; length <= MAX_TOKEN_LENGTH; length++) {
+          if (start + length > searchContent.length) break;
+          const token = searchContent.substring(start, start + length);
+          
+          if (!invertedIndex.has(token)) {
+            invertedIndex.set(token, new Set());
+          }
+          invertedIndex.get(token).add(req.id);
+        }
+      }
+    }
+    
+    return { invertedIndex, reqMap };
+  }, [allRequirements]);
+
+  // Search function using inverted index
+  const searchRequirements = useCallback((term) => {
+    const termLower = term.trim().toLowerCase();
+    
+    if (termLower.length < MIN_SEARCH_LENGTH) {
+      setResults(allRequirements.slice(0, 200));
+      return;
+    }
+
+    const effectiveTerm = termLower.length > MAX_TOKEN_LENGTH 
+      ? termLower.substring(0, MAX_TOKEN_LENGTH) 
+      : termLower;
+
+    const tokens = [];
+    for (let i = 0; i < effectiveTerm.length; i++) {
+      for (let len = MIN_SEARCH_LENGTH; len <= MAX_TOKEN_LENGTH; len++) {
+        if (i + len > effectiveTerm.length) break;
+        tokens.push(effectiveTerm.substring(i, i + len));
+      }
+    }
+
+    const tokenResults = tokens
+      .map(token => invertedIndex.get(token) || new Set())
+      .filter(set => set.size > 0);
+    
+    let resultIds = tokenResults.length > 0
+      ? tokenResults.reduce((intersection, set) => 
+          new Set([...intersection].filter(id => set.has(id)))
+        , tokenResults[0])
+      : new Set();
+
+    // Convert to requirement objects
+    const resultsArray = Array.from(resultIds)
+      .map(id => reqMap.get(id))
+      .filter(Boolean)
+      .slice(0, 200);
+
+    setResults(resultsArray);
+  }, [invertedIndex, reqMap, allRequirements]);
+
+  // Load requirements
   useEffect(() => {
     const loadCatalogs = async () => {
       const result = await invoke('getAllCatalogs');
-      setCatalogs(result);
-      const allRequirements = result.flatMap(catalog =>
-        (catalog.requirements || []).map(req => ({
-          ...req,
-          catalogId: catalog.id,
-          catalogTitle: catalog.title
-        }))
+      const allReqs = result.flatMap(catalog => 
+        (catalog.requirements || [])
+          .filter(req => !req.isContainer)
+          .map(req => ({
+            ...req,
+            catalogId: catalog.id,
+            catalogTitle: catalog.title
+          }))
       );
-      allRequirements.filter(req => !req.isContainer);
-      setRequirements(allRequirements);
+      setAllRequirements(allReqs);
+      setResults(allReqs.slice(0, 200));
     };
     
     loadCatalogs();
   }, []);
 
-  // Search for requirements based on the search term
+  // Handle search term changes
   useEffect(() => {
-    const search = async () => {
-      setLoading(true);
-      const allReqs = catalogs.flatMap(catalog => 
-        (catalog.requirements || []).map(req => ({
-          ...req,
-          catalogId: catalog.id,
-          catalogTitle: catalog.title
-        }))
-      );
+    if (searchTimerRef.current) {
+      clearTimeout(searchTimerRef.current);
+    }
 
-      if (searchTerm.length < 1) {
-        setRequirements(allReqs);
-        setLoading(false);
-      }
-      const filtered = allReqs.filter(req =>
-        Object.entries(req)
-          .filter(([key]) => key !== 'dependencies' && key !== 'correlation')
-          .some(([, value]) =>
-        String(value).toLowerCase().includes(searchTerm.toLowerCase())
-          )
-      );
-      setRequirements(filtered);
+    if (!searchTerm.trim()) {
+      setResults(allRequirements.slice(0, 200));
       setLoading(false);
+      return;
+    }
 
-      tableRows = requirements.map(req => ({
-        cells: [
-          { content: <Tag text={req.id} appearance="primary" /> },
-          { content: <Text weight="medium">{req.header}</Text> },
-          { content: req.catalogTitle },
-          { content: <Button onClick={() => onSelect(req)}>Seleccionar</Button> }
-        ]
-      }));
-    };
+    setLoading(true);
+    searchTimerRef.current = setTimeout(() => {
+      searchRequirements(searchTerm);
+      setLoading(false);
+    }, 300);
 
-    const timeoutId = setTimeout(search, 300);
-    return () => clearTimeout(timeoutId);
-  }, [searchTerm, catalogs]);
-
+    return () => clearTimeout(searchTimerRef.current);
+  }, [searchTerm, allRequirements, searchRequirements]);
 
   const head = {
     cells: [
-      {
-        key: "Requirement ID",
-        content: "Requirement ID",
-        isSortable: true,
-      },
-      {
-        key: "Title",
-        content: "Title",
-        isSortable: false,
-      },
-      {
-        key: "Catalog",
-        content: "Catalog",
-        shouldTruncate: true,
-        isSortable: false,
-      },
-      {
-        key: "Action",
-        content: "Action",
-        shouldTruncate: true,
-        isSortable: false,
-      }
-    ],
+      { key: "id", content: "Requirement ID", isSortable: true },
+      { key: "title", content: "Title", isSortable: false },
+      { key: "catalog", content: "Catalog", shouldTruncate: true },
+      { key: "action", content: "Action" }
+    ]
   };
 
-  var tableRows = requirements.map(req => ({
+  const tableRows = results.map(req => ({
+    key: req.id,
     cells: [
       { content: <Tag text={req.id} appearance="primary" /> },
       { content: <Text weight="medium">{req.heading}</Text> },
@@ -114,7 +153,7 @@ const RequirementSearch = ({ onSelect }) => {
         label="Search requirements"
         placeholder="Write to search..."
         value={searchTerm}
-        onChange={e => setSearchTerm( e.target.value )}
+        onChange={e => setSearchTerm(e.target.value)}
         isRequired
       />
       
@@ -127,8 +166,8 @@ const RequirementSearch = ({ onSelect }) => {
         defaultPage={1}
         emptyView={
           searchTerm ? 
-            <Text color="subtlest">No requirements were found for "{searchTerm}"</Text> :
-            <Text color="subtlest">Loading requirements...</Text>
+            <Text color="subtlest">No requirements found for "{searchTerm}"</Text> :
+            <Text color="subtlest">No requirements available</Text>
         }
         marginTop="medium"
       />

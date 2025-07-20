@@ -1,5 +1,13 @@
 # NFR for Jira
 
+## Para el tribunal del TFM
+
+El funcionamiento de este plugin se puede encontrar en mi página personal de Atlassian Jira: https://tomasmolinaumu.atlassian.net/jira/apps/21a61f7f-9789-40f6-a579-99e1d4e0c1a4/73f6f55e-6f65-409a-89f7-fe0ab436aeec/create-catalogues
+
+Los catálogos de prueba están incluidos en la carpeta catalogs, son csv donde solo se necesita copiar y pegar.
+
+## Description
+
 This project features a straightforward Forge app built with JavaScript, designed to create and manage non-functionnal requirements catalogs, link those requirements to Jira Issues and see differents statistiques. The application is accessible from a dedicated Jira global page. Some of the key modules utilized in the app include [UI kit](https://developer.atlassian.com/platform/forge/ui-kit/components/) for frontend.
 
 See [developer.atlassian.com/platform/forge/](https://developer.atlassian.com/platform/forge) for documentation and tutorials explaining Forge.

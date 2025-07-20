@@ -1,20 +1,17 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Text } from '@forge/react';
+import { Text, Box } from '@forge/react';
 import { invoke } from '@forge/bridge';
 import Card from '../Card';
 import RequirementSearch from '../RequirementSearch';
 
-/**
- * Component to display requiremetnss from all catalogs.
- * They can be display in form of list with all requirements or in a searcher .
- */
 const AllRequirementsList = ({ onUpdateRequirement, onDeleteRequirement }) => {
   const [requirements, setRequirements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState([]);
 
-  // On loading the component, we fetch all the requirements.
+  // Fetch all requirements from all catalogs
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -26,95 +23,133 @@ const AllRequirementsList = ({ onUpdateRequirement, onDeleteRequirement }) => {
           catalogId: catalog.id,
         }))
       );
-      // Filter out container requirements and sort them here
+      
+      // Filter out container requirements
       const filteredAndSorted = allReqs
         .filter(req => !req.isContainer)
         .sort((a, b) => {
-          // Extract prefix and number for natural sort
+          // Natural sort function for IDs
           const parseId = id => {
-        const match = id.match(/^([a-zA-Z\-]+)?(\d+)$/i);
-        if (match) {
-          return { prefix: match[1] || '', num: parseInt(match[2], 10) };
-        }
-        return { prefix: id, num: 0 };
+            const match = id.match(/^([a-zA-Z\-]+)?(\d+)$/i);
+            if (match) {
+              return { prefix: match[1] || '', num: parseInt(match[2], 10) };
+            }
+            return { prefix: id, num: 0 };
           };
+          
           const aParts = parseId(a.id);
           const bParts = parseId(b.id);
 
           if (aParts.prefix === bParts.prefix) {
-        return aParts.num - bParts.num;
+            return aParts.num - bParts.num;
           }
           return aParts.prefix.localeCompare(bParts.prefix);
         });
+      
       setRequirements(filteredAndSorted);
     } catch (err) {
+      console.error('Error fetching requirements:', err);
       setError(err.message);
     } finally {
       setLoading(false);
     }
   }, []);
+
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
-  /**
-   * Handler to delete a requirement for the searcher and the list.
-   * @param {*} catalogId 
-   * @param {*} reqId 
-   */
-  const handleDeleteRequirement =  async(catalogId, reqId) => {
-    const flag = await onDeleteRequirement(catalogId, reqId);
-    if(flag === true) {
-      setRequirements((prev) => prev.filter((req) => req.id !== reqId));
-
+  // Handle requirement deletion
+  const handleDeleteRequirement = async (catalogId, reqId) => {
+    try {
+      await onDeleteRequirement(catalogId, reqId);
+      setRequirements(prev => prev.filter(req => req.id !== reqId));
+      setSearchResults(prev => prev.filter(req => req.id !== reqId));
+    } catch (err) {
+      console.error('Error deleting requirement:', err);
     }
-  }
+  };
 
-
-  /**
-   * Handler to update a requirement for the searcher and the list.
-   * @param {*} catalogId
-   * @param {*} reqId
-   * @param {*} updatedData
-   * @returns
-   * */
+  // Handle requirement update
   const handleUpdateRequirement = (catalogId, reqId, updatedData) => {
-    setRequirements((prev) =>
-      prev.map((req) => (req.id === reqId ? { ...req, ...updatedData } : req))
+    const updateList = list => list.map(req => 
+      req.id === reqId ? { ...req, ...updatedData } : req
     );
+    
+    setRequirements(updateList);
+    setSearchResults(updateList);
     onUpdateRequirement(catalogId, reqId, updatedData);
-  }
+  };
 
-
-  /**
-   * Handler to set the searcher and disable the list.
-   */
-  const handleSearching = useCallback((searching) => {
-    setIsSearching(searching);
+  // Handle search toggle
+  const handleSearchToggle = useCallback((isActive) => {
+    setIsSearching(isActive);
+    if (!isActive) {
+      setSearchResults([]);
+    }
   }, []);
 
-  // If the page is loading, we show a loading message.
+  // Handle search results
+  const handleSearchResults = useCallback((results) => {
+    setSearchResults(results);
+  }, []);
+
   if (loading) return <Text>Loading requirements...</Text>;
-  // In case of some error
   if (error) return <Text color="danger">Error: {error}</Text>;
 
   return (
-    <>
+    <Box padding="medium">
+      {/* Requirement Search Component */}
+      <RequirementSearch 
+        onValueChange={handleSearchToggle}
+        onResultsChange={handleSearchResults}
+        onUpdateRequirement={handleUpdateRequirement}
+        onDeleteRequirement={handleDeleteRequirement}
+        allReqs={requirements}
+      />
+
+      {/* Search Results */}
+      {isSearching && (
+        <Box marginTop="large">
+          {searchResults.length > 0 ? (
+            <>
+              <Text size="xlarge" weight="bold" marginBottom="large">
+                Search Results ({searchResults.length})
+              </Text>
+              {searchResults.map(req => (
+                <Card
+                  key={`${req.id}-search`}
+                  req={req}
+                  onUpdateRequirement={handleUpdateRequirement}
+                  onDeleteRequirement={handleDeleteRequirement}
+                />
+              ))}
+            </>
+          ) : (
+            <Text color="disabled" marginTop="medium">
+              No requirements found matching your search
+            </Text>
+          )}
+        </Box>
+      )}
+
+      {/* All Requirements List */}
       {!isSearching && (
-        <>
+        <Box marginTop="large">
           <Text size="xlarge" weight="bold" marginBottom="large">
-            Todos los Requisitos ({requirements.length})
+            All Requirements ({requirements.length})
           </Text>
-          {requirements.map((req) => (
+          {requirements.map(req => (
             <Card
+              key={`${req.id}-list`}
               req={req}
               onUpdateRequirement={handleUpdateRequirement}
               onDeleteRequirement={handleDeleteRequirement}
             />
           ))}
-        </>
+        </Box>
       )}
-    </>
+    </Box>
   );
 };
 

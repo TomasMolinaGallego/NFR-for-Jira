@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   Stack,
   Heading,
@@ -13,86 +13,98 @@ import {
 } from '@forge/react';
 import { invoke, view } from '@forge/bridge';
 
-// --- Utilidades de CSV ---
 const REQUIRED_HEADERS = ['id', 'level', 'section', 'heading', 'text', 'important', 'dependencies'];
 
-function parseCSVLine(line) {
-  const fields = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
-      } else {
-        inQuotes = !inQuotes;
-      }
-    } else if (char === ';' && !inQuotes) {
-      fields.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  fields.push(current);
-  return fields;
-}
+// CSV parser optimizado
+const parseCSV = (text) => {
+  if (!text.trim()) return [];
 
-function parseCSV(text) {
   const lines = text.trim().split('\n');
   if (lines.length < 2) throw new Error('CSV must contain at least 2 lines (headers + data)');
-  const headers = parseCSVLine(lines[0]).map(h => h.trim().toLowerCase());
+  
+  const headers = lines[0].split(';').map(h => h.trim().toLowerCase());
   const missing = REQUIRED_HEADERS.filter(h => !headers.includes(h));
   if (missing.length) throw new Error(`Missing required columns: ${missing.join(', ')}`);
 
-  return lines.slice(1).reduce((items, line, idx) => {
-    if (!line.trim()) return items;
-    const values = parseCSVLine(line.trim());
-    if (values.length !== headers.length)
-      throw new Error(`Line ${idx + 2}: Incorrect number of fields`);
-    const item = Object.fromEntries(headers.map((h, i) => [h, values[i].trim()]));
-    const level = parseInt(item.level, 10);
-    if (isNaN(level)) throw new Error(`Line ${idx + 2}: 'level' must be a number`);
-    items.push({
-      id: item.id,
-      level,
-      section: item.section,
-      heading: item.heading,
-      text: item.text,
-      dependencies: item.dependencies ? item.dependencies.split(',').map(d => d.trim()) : [],
-      children: [],
-      important: parseInt(item.important, 10),
-    });
-    return items;
-  }, []);
-}
+  const headerIndexMap = headers.reduce((map, header, index) => {
+    map[header] = index;
+    return map;
+  }, {});
 
-function buildHierarchy(items) {
+  return lines.slice(1).map((line, i) => {
+    const trimmedLine = line.trim();
+    if (!trimmedLine) return null;
+    
+    const values = trimmedLine.split(';');
+    if (values.length !== headers.length) {
+      throw new Error(`Line ${i + 2}: Incorrect number of fields`);
+    }
+
+    const level = parseInt(values[headerIndexMap.level], 10);
+    if (isNaN(level)) throw new Error(`Line ${i + 2}: 'level' must be a number`);
+    
+    const important = parseInt(values[headerIndexMap.important], 10);
+    if (isNaN(important)) throw new Error(`Line ${i + 2}: 'important' must be a number`);
+
+    return {
+      id: values[headerIndexMap.id].trim(),
+      level,
+      section: values[headerIndexMap.section].trim(),
+      heading: values[headerIndexMap.heading].trim(),
+      text: values[headerIndexMap.text].trim(),
+      dependencies: values[headerIndexMap.dependencies] 
+        ? values[headerIndexMap.dependencies].split(',').map(d => d.trim()) 
+        : [],
+      important,
+    };
+  }).filter(Boolean);
+};
+
+// Construcción de jerarquía optimizada
+const buildHierarchy = (items) => {
+  if (!items.length) return [];
+
   const map = new Map();
-  items.forEach(item => map.set(item.section, { ...item }));
+  items.forEach(item => map.set(item.section, { ...item, children: [] }));
+
   const roots = [];
-  map.forEach((item, section) => {
+  for (const [section, item] of map) {
     const parentSection = section.split('.').slice(0, -1).join('.');
     if (parentSection && map.has(parentSection)) {
       map.get(parentSection).children.push(item);
     } else {
       roots.push(item);
     }
-  });
-  const sortBySection = (a, b) => a.section.localeCompare(b.section);
-  const sortTree = nodes => nodes.sort(sortBySection).forEach(n => sortTree(n.children));
+  }
+
+  // Ordenar recursivamente
+  const sortTree = nodes => {
+    nodes.sort((a, b) => a.section.localeCompare(b.section));
+    nodes.forEach(node => sortTree(node.children));
+  };
+  
   sortTree(roots);
   return roots;
-}
+};
 
-function countRequirements(nodes) {
-  return nodes.reduce((count, node) => count + 1 + countRequirements(node.children), 0);
-}
+// Contador de requisitos optimizado
+const countRequirements = (nodes) => {
+  if (!nodes.length) return 0;
+  
+  let count = 0;
+  const stack = [...nodes];
+  
+  while (stack.length) {
+    const node = stack.pop();
+    count++;
+    stack.push(...node.children);
+  }
+  
+  return count;
+};
 
-// --- Componentes auxiliares ---
-const RequirementNode = ({ requirement, depth = 0 }) => (
+// Componente memoizado para nodos de requisitos
+const RequirementNode = React.memo(({ requirement, depth = 0 }) => (
   <Box padding="space.0" marginBottom="space.100">
     <Box
       padding="space.200"
@@ -126,80 +138,104 @@ const RequirementNode = ({ requirement, depth = 0 }) => (
       ))}
     </Stack>
   </Box>
-);
+));
 
-// --- Componente principal ---
 const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
-  const [requirements, setRequirements] = useState([]);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [csvText, setCsvText] = useState('');
-  const [showPreview, setShowPreview] = useState(false);
   const [saveStatus, setSaveStatus] = useState(null);
   const [catalogName, setCatalogName] = useState('');
   const [catalogDescription, setCatalogDescription] = useState('');
   const [catalogPrefix, setCatalogPrefix] = useState('');
+  const [csvText, setCsvText] = useState('');
+  
+  // Memoized processing results
+  const [processingResult, setProcessingResult] = useState({
+    flatItems: [],
+    hierarchy: [],
+    showPreview: false
+  });
 
+  // Procesar CSV sin almacenar el texto completo
   const handleProcessCSV = useCallback(() => {
     setError(null);
     setSaveStatus(null);
     setLoading(true);
+    
     try {
-      const items = parseCSV(csvText);
-      const hierarchy = buildHierarchy(items);
-      setRequirements(hierarchy);
-      setShowPreview(true);
+      const flatItems = parseCSV(csvText);
+      const hierarchy = buildHierarchy(flatItems);
+      
+      setProcessingResult({
+        flatItems,
+        hierarchy,
+        showPreview: true
+      });
     } catch (err) {
       setError(`Error processing CSV: ${err.message}`);
-      setRequirements([]);
-      setShowPreview(false);
+      setProcessingResult({
+        flatItems: [],
+        hierarchy: [],
+        showPreview: false
+      });
     } finally {
       setLoading(false);
     }
   }, [csvText]);
 
   const handleSaveRequirements = useCallback(async () => {
-    if (!requirements.length) {
+    if (!processingResult.hierarchy.length) {
       setError('There are no valid requirements to save');
       return;
     }
+    
     setLoading(true);
     setError(null);
+    
     try {
       const accountId = await view.getContext();
-      console.log('Saving requirements to catalog:', accountId);
       const result = await invoke('importRequirementsFromCustomCSV', {
         catalogId,
         catalogName,
         catalogDescription,
-        requirements,
+        requirements: processingResult.hierarchy,
         prefix: catalogPrefix,
         userId: accountId
       });
+      
       setSaveStatus({
         success: result.success > 0,
         message: result.success > 0
           ? `${result.success} requirements imported successfully!`
           : 'Error importing requirements',
       });
+      
       if (result.success > 0 && onSuccess) onSuccess();
     } catch (err) {
       setError(`Connection error: ${err.message}`);
     } finally {
       setLoading(false);
     }
-  }, [catalogId, catalogName, requirements, onSuccess]);
+  }, [catalogId, catalogName, catalogPrefix, onSuccess, processingResult]);
 
-  const resetState = () => {
+  const resetState = useCallback(() => {
     setCsvText('');
-    setRequirements([]);
-    setShowPreview(false);
+    setProcessingResult({
+      flatItems: [],
+      hierarchy: [],
+      showPreview: false
+    });
     setError(null);
     setSaveStatus(null);
     setCatalogName('');
-  };
+    setCatalogDescription('');
+    setCatalogPrefix('');
+  }, []);
 
-  const totalRequirements = countRequirements(requirements);
+  // Memoized requirement count
+  const totalRequirements = useMemo(() => {
+    return countRequirements(processingResult.hierarchy);
+  }, [processingResult.hierarchy]);
 
   return (
     <Stack space="space.400">
@@ -207,6 +243,7 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
       <Text>
         Required format: Semicolon (;) separated with columns: id, level, section, heading, text, important.
       </Text>
+      
       <Box border="1px solid" borderColor="color.border" borderRadius="border.radius.200" padding="space.200">
         <Stack space="space.200">
           <TextArea
@@ -218,7 +255,7 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
             isMonospaced
             rows={1}
           />
-            <TextArea
+          <TextArea
             value={catalogDescription}
             onChange={e => setCatalogDescription(e.target.value)}
             placeholder="Catalog description..."
@@ -227,10 +264,10 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
             isMonospaced
             rows={1}
           />
-            <TextArea
+          <TextArea
             value={catalogPrefix}
             onChange={e => setCatalogPrefix(e.target.value)}
-            placeholder="Catalog prefixe..."
+            placeholder="Catalog prefix..."
             resize="vertical"
             appearance="standard"
             isMonospaced
@@ -250,7 +287,13 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
               iconBefore="code"
               appearance="primary"
               onClick={handleProcessCSV}
-              isDisabled={loading || !csvText.trim() || !catalogName.trim()}
+              isDisabled={
+                loading ||
+                !csvText ||
+                !catalogName ||
+                !catalogDescription ||
+                !catalogPrefix
+              }
             >
               {loading ? 'Processing...' : 'Process CSV'}
             </Button>
@@ -258,12 +301,14 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
           </Box>
         </Stack>
       </Box>
+      
       {loading && (
         <Box display="flex" alignItems="center" gap="space.200">
           <Spinner size="medium" />
           <Text>Processing CSV content...</Text>
         </Box>
       )}
+      
       {error && (
         <SectionMessage appearance="error" title="CSV Error">
           <Text>{error}</Text>
@@ -272,6 +317,7 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
           </SectionMessageAction>
         </SectionMessage>
       )}
+      
       {saveStatus && (
         <SectionMessage
           appearance={saveStatus.success ? "success" : "error"}
@@ -285,7 +331,8 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
           )}
         </SectionMessage>
       )}
-      {showPreview && requirements.length > 0 && (
+      
+      {processingResult.showPreview && processingResult.hierarchy.length > 0 && (
         <Box
           border="1px solid"
           borderColor="color.border"
@@ -298,9 +345,10 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
             <Heading level="h500">Requirements Preview</Heading>
             <Tag
               text={`${totalRequirements} requirements`}
-              appearance={totalRequirements > 0 ? "success" : "removed"}
+              appearance={totalRequirements > 0 ? "success" : "removed"} 
             />
           </Box>
+          
           <Box marginTop="space.300" display="flex" justifyContent="flex-end">
             <Button
               appearance="primary"
@@ -310,14 +358,16 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
               {loading ? 'Saving...' : 'Import to Catalog'}
             </Button>
           </Box>
+          
           <Stack space="space.200">
-            {requirements.map(req => (
+            {processingResult.hierarchy.map(req => (
               <RequirementNode key={req.id} requirement={req} />
             ))}
           </Stack>
         </Box>
       )}
-      {showPreview && requirements.length === 0 && !loading && (
+      
+      {processingResult.showPreview && !processingResult.hierarchy.length && !loading && (
         <SectionMessage appearance="info" title="No requirements processed">
           <Text>The CSV does not contain valid requirements to display</Text>
         </SectionMessage>
@@ -326,4 +376,4 @@ const CSVRequirementsLoader = ({ catalogId, onSuccess }) => {
   );
 };
 
-export default CSVRequirementsLoader;
+export default React.memo(CSVRequirementsLoader);

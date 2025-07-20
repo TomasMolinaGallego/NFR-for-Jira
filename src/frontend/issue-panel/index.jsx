@@ -140,7 +140,7 @@
     const linkedTableRows = linkedRequirements.map(req => ({
       cells: [
         { content: <Tag text={req.reqId} appearance="primary" /> },
-        { content: req.header },
+        { content: req.heading },
         { content: req.text },
         { content: getStatusLozenge(req.status)} ,
         { content: req.catalogTitle },

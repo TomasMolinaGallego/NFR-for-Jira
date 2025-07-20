@@ -1,4 +1,4 @@
-import React, { useState, useCallback, memo, useEffect } from 'react';
+import React, { useState, useCallback, memo, useMemo } from 'react';
 import {
   ListItem,
   Stack,
@@ -10,69 +10,20 @@ import {
   Badge
 } from '@forge/react';
 import EditRequirementModal from '../EditRequirementModal';
-import CSVImporter from '../CsvImporter';
-import CSVRequirementsLoader from '../CsvImporter/csvImporter';
 
+// Mover fuera del componente para evitar recreación
 const getImportanceAppearance = (value) => {
   const num = parseInt(value) || 0;
   if (num < 33) return 'added';
   if (num < 66) return 'primary';
   return 'important';
 };
+
 /**
- * Component to display a requirement of a catalog, it can be expanded to show more details.
- * It allows editing and deleting the requirement.
+ * Componente memoizado para mostrar un requisito individual
  */
-const CatalogListItem = memo(({
-  catalog,
-  onSelect,
-  onDelete,
-  onUpdateRequirement,
-  history,
-  onUpdateCsv
-}) => {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [editingRequirement, setEditingRequirement] = useState(null);
-
-  useEffect(() => {
-    catalog.requirements = catalog.requirements.filter(req => !req.isContainer);
-  });
-
-  const toggleExpanded = useCallback(() => {
-    setIsExpanded(prev => !prev);
-  }, []);
-
-  /**
-   * * Handler to edit a requirement. It assigns the selected requirement to the editingRequirement state.
-   */
-  const handleEditRequirement = useCallback((requirement) => {
-    setEditingRequirement(requirement);
-  }, []);
-
-  /**
-   * Handler to save changes made to a requirement. It calls the onUpdateRequirement function passed as a prop.
-   */
-  const handleSaveChanges = useCallback(async (updatedData) => {
-    await onUpdateRequirement(catalog.id, editingRequirement.id, updatedData);
-    setEditingRequirement(null);
-  }, [catalog.id, editingRequirement, onUpdateRequirement]);
-
-  /**
-   * * Handler to import a CSV file. It calls the onUpdateCsv function passed as a prop.
-   */
-  const handleCsvImportComplete = useCallback(async () => {
-    await onUpdateCsv?.();
-    setIsCsvImporterOpen(false);
-  }, [onUpdateCsv]);
-
-  /**
-   * Handler to change the location of the catalog only used to consult the details of a catalog.
-   */
-  const changeLocation = useCallback(() => {
-    history.push(`/catalogues/${catalog.id}`);
-  }, [catalog.id, history]);
-
-  const renderRequirementBadges = useCallback((req) => (
+const RequirementItem = memo(({ req, onEdit }) => {
+  const badges = useMemo(() => (
     <Inline space="small" marginTop="small">
       {req.type && <Badge appearance="primary">{req.type}</Badge>}
       {req.category && <Badge appearance="added">{req.category}</Badge>}
@@ -85,46 +36,96 @@ const CatalogListItem = memo(({
         </Badge>
       )}
     </Inline>
-  ), []);
+  ), [req.type, req.category, req.important]);
 
-  const renderRequirementDetails = useCallback((req) => (
-    <Stack space="small">
-      <Text weight="bold">{req.heading}</Text>
-      <Text>Section: {req.section}</Text>
-      <Text>{req.text}</Text>
-      {renderRequirementBadges(req)}
-      {req.dependencies?.length !== 0 ? <Text>Dependencies: {req.dependencies.join(', ')}</Text> : ""}
-      {req.childrenIds?.length !== 0 ? <Text>Children requirements : {req.childrenIds?.join(', ')}</Text> : ""}
-    </Stack>
-  ), [renderRequirementBadges]);
+  return (
+    <ListItem>
+      <Inline spread="space-between" alignBlock="center">
+        <Stack space="small">
+          <Text weight="bold">{req.heading}</Text>
+          <Text>Section: {req.section}</Text>
+          <Text>{req.text}</Text>
+          {badges}
+          {req.dependencies?.length > 0 && 
+            <Text>Dependencies: {req.dependencies.join(', ')}</Text>
+          }
+          {req.childrenIds?.length > 0 && 
+            <Text>Children requirements: {req.childrenIds.join(', ')}</Text>
+          }
+        </Stack>
+        <Button
+          iconBefore="edit"
+          appearance="subtle"
+          onClick={() => onEdit(req)}
+          aria-label={`Editar requisito ${req.id}`}
+        />
+      </Inline>
+    </ListItem>
+  );
+});
 
-  const renderRequirements = useCallback(() => {
+/**
+ * Componente principal optimizado para memoria
+ */
+const CatalogListItem = memo(({
+  catalog: originalCatalog,
+  onSelect,
+  onDelete,
+  onUpdateRequirement,
+  history,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [editingRequirement, setEditingRequirement] = useState(null);
+  
+  // Filtrar requisitos una sola vez usando useMemo
+  const catalog = useMemo(() => ({
+    ...originalCatalog,
+    requirements: (originalCatalog.requirements || [])
+      .filter(req => !req.isContainer)
+  }), [originalCatalog]);
+
+  const toggleExpanded = useCallback(() => {
+    setIsExpanded(prev => !prev);
+  }, []);
+
+  const handleEditRequirement = useCallback((requirement) => {
+    setEditingRequirement(requirement);
+  }, []);
+
+  const handleSaveChanges = useCallback(async (updatedData) => {
+    if (editingRequirement) {
+      await onUpdateRequirement(catalog.id, editingRequirement.id, updatedData);
+      setEditingRequirement(null);
+    }
+  }, [catalog.id, editingRequirement, onUpdateRequirement]);
+
+  const changeLocation = useCallback(() => {
+    history.push(`/catalogues/${catalog.id}`);
+  }, [catalog.id, history]);
+
+  const handleOpenModal = useCallback(() => {
+    onSelect(catalog);
+    setIsExpanded(false);
+  }, [catalog, onSelect]);
+
+  // Memoizar la lista de requisitos
+  const requirementsList = useMemo(() => {
     if (!catalog.requirements?.length) {
       return <Text color="disabled">There are no requirements in this catalogue</Text>;
     }
 
     return (
       <List testId="requirements-list">
-        {catalog.requirements.map((req) => (
-          <ListItem key={req.id}>
-            <Inline spread="space-between" alignBlock="center">
-              {renderRequirementDetails(req)}
-              <Button
-                iconBefore="edit"
-                appearance="subtle"
-                onClick={() => handleEditRequirement(req)}
-                aria-label={`Editar requisito ${req.id}`}
-              />
-            </Inline>
-          </ListItem>
+        {catalog.requirements.map(req => (
+          <RequirementItem 
+            key={req.id} 
+            req={req} 
+            onEdit={handleEditRequirement} 
+          />
         ))}
       </List>
     );
-  }, [catalog.requirements, handleEditRequirement, renderRequirementDetails]);
-
-  const handleOpenModal = () => {
-    onSelect(catalog)
-  }
+  }, [catalog.requirements, handleEditRequirement]);
 
   return (
     <ListItem padding="medium" background="neutralSubtle" borderRadius="normal">
@@ -141,7 +142,7 @@ const CatalogListItem = memo(({
               <Text weight="bold">{catalog.title}</Text>
               <Text color="subtlest" size="small">{catalog.description}</Text>
               <Text size="small" color="disabled">
-                {catalog.requirements?.length || 0} requirements
+                {catalog.requirements.length} requirements
               </Text>
             </Stack>
           </Inline>
@@ -172,7 +173,7 @@ const CatalogListItem = memo(({
 
         {isExpanded && (
           <Box padding="medium" border="standard" borderRadius="normal">
-            {renderRequirements()}
+            {requirementsList}
           </Box>
         )}
 

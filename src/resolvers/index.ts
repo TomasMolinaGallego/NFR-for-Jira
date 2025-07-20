@@ -118,20 +118,23 @@ resolver.define('deleteCatalog', async ({ payload }) => {
 resolver.define('addRequirement', async ({ payload }) => {
   await updateCatalogRequirements(payload.catalogId, requirements => {
     const reqId = `${payload.prefix}-${requirements.length}`;
+    console.log('Adding requirement with ID:', payload.formState.reqDesc);
+    console.log('Calculated section:', payload);
     return [
       ...requirements,
       {
-        id: reqId,
-        header: payload.formState.reqTitle,
-        text: payload.formState.reqDescription,
-        important: payload.formState.reqImportant,
-        issuesLinked: [],
-        isContainer: false,
-        childrenIds: [],
-        dependencies: [],
-        riesgo: 0,
-        level: 1,
-        siblingCount: 0,
+      id: reqId,
+      heading: payload.formState.reqTitle,
+      text: payload.formState.reqDesc,
+      important: payload.formState.reqImportant,
+      section: payload.formState.section, 
+      issuesLinked: [],
+      isContainer: false,
+      childrenIds: [],
+      dependencies: payload.formState.reqDependencies || [],
+      riesgo: 0,
+      level: 2,
+      siblingCount: 0,
       }
     ];
   });
@@ -331,8 +334,10 @@ resolver.define('importRequirementsFromCustomCSV', async ({ payload }) => {
       ...createNewCatalogData(userId.accountId, catalogName, catalogDescription, prefix),
       requirements: flatReqs
     };
+    console.log('New catalog data:');
     await saveCatalog(newCatalog);
     results.success = flatReqs.length;
+    console.log('Requirements imported successfully:', results.success);
     return results;
   } catch (error: any) {
     results.errors.push({ message: `Error al importar requisitos: ${error.message}` });
@@ -374,5 +379,25 @@ const flattenRequirements = (
     return acc;
   }, []);
 };
+
+resolver.define('deleteAllData', async () => {
+  const allKeys = await storage.query().where('key', { condition: 'STARTS_WITH', value: '' }).getMany();
+  // Calcula el tamaño total en KB de todos los valores almacenados
+  let totalBytes = 0;
+  for (const item of allKeys.results) {
+    if (item.value) {
+      // Convierte el valor a string y calcula los bytes
+      const str = typeof item.value === 'string' ? item.value : JSON.stringify(item.value);
+      totalBytes += Buffer.byteLength(str, 'utf8');
+    }
+  }
+  const totalKB = (totalBytes / 1024).toFixed(2);
+  console.log(`Deleting all data, total keys: ${allKeys.results.length}, total size: ${totalKB} KB`);
+  for (const item of allKeys.results) {
+    await storage.delete(item.key);
+  }
+  return { success: true, deleted: allKeys.results.length };
+});
+
 
 export const handler = resolver.getDefinitions();
